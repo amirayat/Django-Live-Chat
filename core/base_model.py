@@ -1,7 +1,7 @@
 from django.db import models
 
 
-class BaseModelManager(models.Manager):
+class RootModelManager(models.Manager):
     """
     base manager for base model
     """
@@ -10,7 +10,7 @@ class BaseModelManager(models.Manager):
         return super().get_queryset().filter(is_deleted=False)
 
 
-class BaseModel(models.Model):
+class RootModel(models.Model):
     """
     base model
     """
@@ -18,7 +18,12 @@ class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False, serialize=False)
 
-    objects = BaseModelManager()
+    objects = RootModelManager()
+
+    def delete(self, *args, **kwargs) -> tuple:
+        self.is_deleted = True
+        self.save()
+        return tuple()
 
     class Meta:
         abstract = True
