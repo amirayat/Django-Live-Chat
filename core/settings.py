@@ -58,7 +58,8 @@ INSTALLED_APPS = [
     'drf_yasg',
 
     # project apps
-    'chat'
+    'users',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -191,6 +192,8 @@ DRF_STANDARDIZED_ERRORS = {"ENABLE_IN_DEBUG_FOR_UNHANDLED_EXCEPTIONS": True}
 # For demo purposes only. Use a white list in the real world.
 CORS_ORIGIN_ALLOW_ALL = True
 
+AUTH_USER_MODEL = 'users.ChatUser'
+
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
@@ -220,8 +223,9 @@ DJOSER = {
         'user_create': 'djoser.serializers.UserCreateSerializer',
         'user_create_password_retype': 'djoser.serializers.UserCreatePasswordRetypeSerializer',
         'user_delete': 'djoser.serializers.UserDeleteSerializer',
-        'user': 'djoser.serializers.UserSerializer',
-        'current_user': 'djoser.serializers.UserSerializer',
+        'user': 'users.serializers.ChatUserSerializer',
+        'current_user': 'users.serializers.ChatUserSerializer',
+
     },
     'EMAIL': {
         'activation': 'djoser.email.ActivationEmail',
@@ -278,7 +282,7 @@ SIMPLE_JWT = {
 EVENTSTREAM_ALLOW_ORIGIN = 'http://127.0.0.1'
 EVENTSTREAM_ALLOW_CREDENTIALS = True
 EVENTSTREAM_ALLOW_HEADERS = 'Authorization'
-EVENTSTREAM_CHANNELMANAGER_CLASS = 'permissions.permissions.MyChannelManager'
+EVENTSTREAM_CHANNELMANAGER_CLASS = 'core.permissions.ChannelManager'
 
 # max number of message in client chat page
 MESSAGE_LIMITE = 10
