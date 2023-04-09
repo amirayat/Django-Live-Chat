@@ -52,7 +52,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'channels',
     'django_eventstream',
-
     'rest_framework',
     'djoser',
     'drf_standardized_errors',
@@ -93,7 +92,8 @@ TEMPLATES = [
     },
 ]
 
-ASGI_APPLICATION = 'core.routing.application'
+ASGI_APPLICATION = 'core.asgi.application'
+# WSGI_APPLICATION = 'core.wsgi.application'
 
 CHANNEL_LAYERS = {
     'default': {
@@ -147,6 +147,8 @@ TIME_ZONE = 'UTC'
 USE_I18N = False
 
 USE_TZ = True
+
+SITE_ID = 1
 
 
 # Static files (CSS, JavaScript, Images)
