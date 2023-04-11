@@ -1,4 +1,3 @@
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from djoser.conf import settings
 from djoser.serializers import UserSerializer
@@ -17,13 +16,3 @@ class ChatUserSerializer(UserSerializer):
             settings.LOGIN_FIELD,
             'photo'     ### add photo to fields
         )
-
-
-class MemberSerializer(serializers.ModelSerializer):
-    """
-    serializer to show chat room members
-    """
-    class Meta:
-        model = User
-        fields = ("id","username", "photo")
-        read_only_fields = ("id","username", "photo")
