@@ -1,17 +1,35 @@
 from django.urls import path, include
 from rest_framework import routers
-from chat.views import ChatRoomMessageView, UnreadMessages
+from chat.views import AddMemberToGroupAPIView, BlockUserAPIView, Un_LockGroupAPIView, CloseGroupAPIView, DemoteAdminAPIView, GroupUpdateAPIView, GroupViewSet, JoinPublicGroupAPIView, LeaveGroupAPIView, PrivateChatViewSet, PromoteMemberAPIView, RemoveMemberFromGroupAPIView, TicketViewSet, CloseTicketAPIView, AssignStaffToTicketAPIView, UnBlockUserAPIView
 
 
-chat_room_router = routers.DefaultRouter()
-chat_room_router.register(r'', TicketViewSet)
+ticket_router = routers.DefaultRouter()
+ticket_router.register(r'', TicketViewSet)
 
-predefind_message_router = routers.DefaultRouter()
-predefind_message_router.register(r'', PredefindMessageViewSet)
+provate_chat_router = routers.DefaultRouter()
+provate_chat_router.register(r'', PrivateChatViewSet)
+
+group_router = routers.DefaultRouter()
+group_router.register(r'', GroupViewSet)
+
 
 urlpatterns = [
-    path('chatroom/<int:chat_room_id>/messages/', ChatRoomMessageView.as_view()),
-    path('chatroom/', include(chat_room_router.urls)),
-    path('message/predefind/', include(predefind_message_router.urls)),
-    path('message/unread/', UnreadMessages.as_view()),
+    path('ticket/', include(ticket_router.urls)),
+    path('ticket/<int:id>/close/', CloseTicketAPIView.as_view()),
+    path('ticket/<int:id>/assign_staff/', AssignStaffToTicketAPIView.as_view()),
+    
+    path('private_chat/', include(provate_chat_router.urls)),
+    path('private_chat/<int:id>/block/', BlockUserAPIView.as_view()),
+    path('private_chat/<int:id>/unblock/', UnBlockUserAPIView.as_view()),
+
+    path('group/', include(group_router.urls)),
+    path('group/<int:id>/update/', GroupUpdateAPIView.as_view()),
+    path('group/<int:id>/close/', CloseGroupAPIView.as_view()),
+    path('group/<int:id>/lock/', Un_LockGroupAPIView.as_view()),
+    path('group/<int:id>/join/', JoinPublicGroupAPIView.as_view()),
+    path('group/<int:id>/leave/', LeaveGroupAPIView.as_view()),
+    path('group/<int:id>/add/', AddMemberToGroupAPIView.as_view()),
+    path('group/<int:id>/remove/', RemoveMemberFromGroupAPIView.as_view()),
+    path('group/<int:id>/promote/', PromoteMemberAPIView.as_view()),
+    path('group/<int:id>/demote/', DemoteAdminAPIView.as_view()),
 ]
