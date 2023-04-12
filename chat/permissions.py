@@ -1,6 +1,4 @@
-from rest_framework.permissions import IsAdminUser as IsStaff
-from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS
-from chat.models import *
+from rest_framework.permissions import IsAuthenticated, SAFE_METHODS
 
 
 class IsCreator(IsAuthenticated):
@@ -25,15 +23,16 @@ class IsAdmin(IsAuthenticated):
         """
         allow only chat room creator
         """
-        if view.action in ["retrieve", "list", "update", "partial_update"] and \
-            request.user in obj.admins:
+        if request.method != 'DELETE' and request.user in obj.admins:
             return True
 
 
 class IsMember(IsAuthenticated):
     """
-    permission for chat room member
+    permission for chat room not staff member
     """
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and not request.user.is_staff)
 
     def has_object_permission(self, request, view, obj):
         """
@@ -43,21 +42,56 @@ class IsMember(IsAuthenticated):
             return True
 
 
-class IsMemberOrCreator(IsAuthenticated):
+class IsStaffMember(IsAuthenticated):
     """
-    permission for chat room member or creator
+    permission for chat room staff member
     """
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_staff)
 
     def has_object_permission(self, request, view, obj):
-        return (IsCreator.has_object_permission(self, request, view, obj) or
-                IsMember.has_object_permission(self, request, view, obj))
-
-
-class IsMemberAndStaff(IsStaff):
-    """
-    permission for chat room member and staff
-    """
-
-    def has_object_permission(self, request, view, obj):
-        if obj.has_member(request.user):
+        """
+        allow only chat room member
+        """
+        if request.method in SAFE_METHODS and obj.has_member(request.user):
             return True
+
+
+class IsMemberWithAction(IsAuthenticated):
+    """
+    permission for chat room not staff member with PUT, PATCH actions
+    exp: actions are needed to leave group
+    """
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and not request.user.is_staff)
+
+    def has_object_permission(self, request, view, obj):
+        """
+        allow only chat room member
+        """
+        if request.method in ('GET', 'HEAD', 'OPTIONS', 'PUT', 'PATCH') and obj.has_member(request.user):
+            return True
+
+
+class IsStaffMemberWithAction(IsAuthenticated):
+    """
+    permission for chat room staff member with PUT, PATCH actions
+    exp: actions are needed to assign staff to ticket
+    """
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_staff)
+
+    def has_object_permission(self, request, view, obj):
+        """
+        allow only chat room member
+        """
+        if request.method in ('GET', 'HEAD', 'OPTIONS', 'PUT', 'PATCH') and obj.has_member(request.user):
+            return True
+
+
+class IsAuthenticatedNotStaff(IsAuthenticated):
+    """
+    permission for chat room not staff authenticated user
+    """
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and not request.user.is_staff)
