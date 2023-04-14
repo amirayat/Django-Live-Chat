@@ -1,12 +1,14 @@
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
-from chat.models import ChatRoom, UserModel
+from chat.models import ChatRoom, ChatMember, UserModel
+from chat.permissions import permission_coefficients
 
 
-class MemberSerializer(serializers.ModelSerializer):
+class UserMemberSerializer(serializers.ModelSerializer):
     """
     serializer to show chat room members
     """
+
+    username = serializers.CharField(required=True)
 
     class Meta:
         model = UserModel
@@ -25,100 +27,44 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     serializer for chat room with read only members
     it is a base class for other serializer to inherit 
     """
-    members = MemberSerializer(
+    members = UserMemberSerializer(
         many=True, read_only=True, source='some_members')
 
     class Meta:
         model = ChatRoom
-        read_only_fields = None
-        fields = None
+        read_only_fields = ["id", "members"]
+        fields = read_only_fields
 
 
-class WritableSingleMemberChatRoomSerializer(serializers.ModelSerializer):
+class ChatRoomSingleMemberSerializer(serializers.ModelSerializer):
     """
     serilizer to add single member to a chat room
     it is a base class for other serializer to inherit 
     """
-    members = MemberSerializer(many=True, source='some_members')
-
-    def is_valid(self, *, raise_exception=False):
-        assert hasattr(self, 'initial_data'), (
-            'Cannot call `.is_valid()` as no `data=` keyword argument was '
-            'passed when instantiating the serializer instance.'
-        )
-
-        if not hasattr(self, '_validated_data'):
-            try:
-                self._validated_data = self.run_validation(self.initial_data)
-            except ValidationError as exc:
-                self._validated_data = {}
-                self._errors = exc.detail
-            else:
-                self._errors = {}
-
-        if self._errors and raise_exception:
-            raise ValidationError(self.errors)
-
-        members = self.initial_data['members']
-        # no more than 1 member is allowed
-        if len(members) != 1:
-            raise ValidationError({"members": "Insert single member."})
-
-        member = members[0]
-        if not isinstance(member, dict) or not "username" in member.keys():
-            raise ValidationError(
-                {"members": "Member should have a valid username field."})
-
-        return not bool(self._errors)
+    member = UserMemberSerializer(source='some_members')
 
     class Meta:
         model = ChatRoom
-        read_only_fields = None
-        fields = None
+        read_only_fields = ["id"]
+        fields = read_only_fields + ["member"]
 
 
-class WritableMultipleMemberChatRoomSerializer(serializers.ModelSerializer):
+class ChatRoomMultiMemberSerializer(serializers.ModelSerializer):
     """
     serilizer to add multiple members to a chat room
     it is a base serializer for other class to inherit 
     """
-    members = MemberSerializer(many=True, source='some_members')
+    members = UserMemberSerializer(many=True, source='some_members')
 
-    def is_valid(self, *, raise_exception=False):
-        assert hasattr(self, 'initial_data'), (
-            'Cannot call `.is_valid()` as no `data=` keyword argument was '
-            'passed when instantiating the serializer instance.'
-        )
-
-        if not hasattr(self, '_validated_data'):
-            try:
-                self._validated_data = self.run_validation(self.initial_data)
-            except ValidationError as exc:
-                self._validated_data = {}
-                self._errors = exc.detail
-            else:
-                self._errors = {}
-
-        if self._errors and raise_exception:
-            raise ValidationError(self.errors)
-
-        members = self.initial_data['members']
-        # at least 1 member is required
-        if len(members) == 0:
-            raise ValidationError(
-                {"members": "Insert at least single member."})
-
-        for member in members:
-            if not isinstance(member, dict) or not "username" in member.keys():
-                raise ValidationError(
-                    {"members": "Member should have a valid username field."})
-
-        return not bool(self._errors)
+    def validate_members(self, value):
+        if len(self.initial_data['members']) == 0:
+            raise serializers.ValidationError("At least one member is required.")
+        return value
 
     class Meta:
         model = ChatRoom
-        read_only_fields = None
-        fields = None
+        read_only_fields = ["id"]
+        fields = read_only_fields + ["members"]
 
 
 ###
@@ -167,27 +113,7 @@ class TicketSerializer(ChatRoomSerializer):
         fields = read_only_fields + ["name", "priority"]
 
 
-class CloseTicketSerializer(ChatRoomSerializer):
-    """
-    serializer for close ticket
-    """
-
-    class Meta:
-        model = ChatRoom
-        read_only_fields = [
-            "id",
-            "name",
-            "closed",
-            "closed_at",
-            "priority",
-            "read_only",
-            "members",
-            "count_members",
-        ]
-        fields = read_only_fields
-
-
-class AssignStaffToTicketSerializer(WritableSingleMemberChatRoomSerializer):
+class AssignStaffToTicketSerializer(ChatRoomSingleMemberSerializer):
     """
     serializer for staff to assign new staff
     """
@@ -201,10 +127,9 @@ class AssignStaffToTicketSerializer(WritableSingleMemberChatRoomSerializer):
             "closed_at",
             "priority",
             "read_only",
-            "members",
             "count_members",
         ]
-        fields = read_only_fields + ["members"]
+        fields = read_only_fields + ["member"]
 
 
 ###
@@ -226,7 +151,7 @@ class ListPrivateChatSerializer(serializers.ModelSerializer):
         fields = read_only_fields
 
 
-class PrivateChatSerializer(WritableSingleMemberChatRoomSerializer):
+class PrivateChatSerializer(ChatRoomSingleMemberSerializer):
     """
     serializer for private chats
     receive members
@@ -241,25 +166,7 @@ class PrivateChatSerializer(WritableSingleMemberChatRoomSerializer):
             "read_only",
             "count_members",
         ]
-        fields = read_only_fields + ["members"]
-
-
-class BlockUserSerializer(ChatRoomSerializer):
-    """
-    read only serializer to block user
-    """
-
-    class Meta:
-        model = ChatRoom
-        read_only_fields = (
-            "id",
-            "name",
-            "closed",
-            "members",
-            "read_only",
-            "count_members",
-        )
-        fields = read_only_fields
+        fields = read_only_fields + ["member"]
 
 
 ###
@@ -283,7 +190,7 @@ class ListGroupSerializer(serializers.ModelSerializer):
         fields = read_only_fields
 
 
-class CreateGroupSerializer(WritableMultipleMemberChatRoomSerializer):
+class CreateGroupSerializer(ChatRoomMultiMemberSerializer):
     """
     serializer for group creation
     recieve [photo,name,type,members]
@@ -337,27 +244,7 @@ class UpdateGroupSerializer(ChatRoomSerializer):
         ]
 
 
-class ReadOnlyGroupSerializer(ChatRoomSerializer):
-    """
-    serializer to close group
-    """
-
-    class Meta:
-        model = ChatRoom
-        read_only_fields = (
-            "id",
-            "photo",
-            "name",
-            "closed",
-            "type",
-            "read_only",
-            "members",
-            "count_members",
-        )
-        fields = read_only_fields
-
-
-class WritableSingleGroupMemberSerializer(WritableSingleMemberChatRoomSerializer):
+class GroupSingleMemberSerializer(ChatRoomSingleMemberSerializer):
     """
     serializer to add new member to group
     recieve single member
@@ -374,4 +261,123 @@ class WritableSingleGroupMemberSerializer(WritableSingleMemberChatRoomSerializer
             "read_only",
             "count_members",
         ]
-        fields = read_only_fields + ["members"]
+        fields = read_only_fields + ["member"]
+
+
+class AdminActionPermissionSerializer(serializers.ModelSerializer):
+    """
+    serilizer to read action permission of a chat room admin
+    """
+
+    # admin actions
+    update_group = serializers.SerializerMethodField()
+    close_group = serializers.SerializerMethodField()
+    lock_group = serializers.SerializerMethodField()
+    add_member = serializers.SerializerMethodField()
+    remove_member = serializers.SerializerMethodField()
+
+    # member actions
+    join_group = serializers.SerializerMethodField()
+    send_message = serializers.SerializerMethodField()
+
+    def is_valid(self, *, raise_exception=False):
+        required_fields = set(self.get_fields().keys()) - \
+            {"role", "action_permission"}
+        entered_fields = set(self.initial_data.keys()) - \
+            {"role", "action_permission"}
+        if not required_fields.issubset(entered_fields):
+            raise serializers.ValidationError(
+                f"required fields: {required_fields-entered_fields}")
+        for field, value in self.initial_data.items():
+            if field in required_fields and not isinstance(value, bool):
+                raise serializers.ValidationError(
+                    "Only Boolean type is allowed.")
+        return super().is_valid(raise_exception=raise_exception)
+
+    def get_update_group(self, object):
+        return object.action_permission % permission_coefficients["update_group"] == 0
+
+    def get_close_group(self, object):
+        return object.action_permission % permission_coefficients["close_group"] == 0
+
+    def get_lock_group(self, object):
+        return object.action_permission % permission_coefficients["lock_group"] == 0
+
+    def get_add_member(self, object):
+        return object.action_permission % permission_coefficients["add_member"] == 0
+
+    def get_remove_member(self, object):
+        return object.action_permission % permission_coefficients["remove_member"] == 0
+
+    def get_join_group(self, object):
+        return object.action_permission % permission_coefficients["join_group"] == 0
+
+    def get_send_message(self, object):
+        return object.action_permission % permission_coefficients["send_message"] == 0
+
+    class Meta:
+        model = ChatMember
+        read_only_fields = [
+            "role",
+            "update_group",
+            "close_group",
+            "lock_group",
+            "add_member",
+            "remove_member",
+            "join_group",
+            "send_message",
+        ]
+        fields = read_only_fields
+
+
+class MemberActionPermissionSerializer(AdminActionPermissionSerializer):
+    """
+    serilizer to read action permission of a chat room member
+    """
+
+    class Meta:
+        model = ChatMember
+        read_only_fields = [
+            "role",
+            "join_group",
+            "send_message",
+        ]
+        fields = read_only_fields
+
+
+class AdminSerializer(serializers.ModelSerializer):
+    """
+    serializer for chat member with all action permissions
+    """
+    permission = AdminActionPermissionSerializer(source='member')
+
+    def validate_permission(self,value):
+        permission_serializer = AdminActionPermissionSerializer(
+            data=self.initial_data['permission'])
+        permission_serializer.is_valid(raise_exception=True)
+        return value
+
+    class Meta:
+        model = ChatRoom
+        fields = [
+            "permission"
+        ]
+
+
+class MemberSerializer(serializers.ModelSerializer):
+    """
+    serializer for chat member with all action permissions
+    """
+    permission = MemberActionPermissionSerializer(source='member')
+
+    def validate_permission(self,value):
+        permission_serializer = MemberActionPermissionSerializer(
+            data=self.initial_data['permission'])
+        permission_serializer.is_valid(raise_exception=True)
+        return value
+
+    class Meta:
+        model = ChatRoom
+        fields = [
+            "permission"
+        ]
