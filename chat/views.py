@@ -1,32 +1,38 @@
 from functools import lru_cache
 from django.http import Http404
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 from rest_framework import status, exceptions
 from rest_framework.response import Response
-from rest_framework.generics import RetrieveUpdateAPIView
+from rest_framework.generics import RetrieveUpdateAPIView, UpdateAPIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.permissions import IsAdminUser as IsStaff
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, ListModelMixin
-from chat.models import ChatRoom
-from chat.serializers import (ListGroupSerializer,
+from chat.models import ChatRoom, ChatMember
+from chat.serializers import (ChatRoomSerializer,
+                              ListGroupSerializer,
                               ListPrivateChatSerializer,
                               ListTicketSerializer,
-                              WritableSingleGroupMemberSerializer,
-                              BlockUserSerializer,
+                              GroupSingleMemberSerializer,
                               CreateGroupSerializer,
                               PrivateChatSerializer,
-                              ReadOnlyGroupSerializer,
                               TicketSerializer,
-                              CloseTicketSerializer,
                               AssignStaffToTicketSerializer,
-                              UpdateGroupSerializer)
-from chat.permissions import (IsCreator,
+                              UpdateGroupSerializer,
+                              AdminSerializer,
+                              MemberSerializer)
+from chat.permissions import (IsAdmin_CanAdd,
+                              IsAdmin_CanClose,
+                              IsAdmin_CanLock,
+                              IsAdmin_CanRemove,
+                              IsAdmin_CanUpdate,
+                              IsCreator,
                               IsAdmin,
                               IsMember,
-                              IsStaffMember,
-                              IsMemberWithAction,
-                              IsStaffMemberWithAction,
-                              IsAuthenticatedNotStaff)
+                              IsMemberNotStaff,
+                              IsAuthenticatedNotStaff,
+                              permission)
 
 
 UserModel = get_user_model()
@@ -35,26 +41,7 @@ UserModel = get_user_model()
 ###
 # BASE CLASSES FOR OTHER VIEWS
 ###
-class CloseChatRoomAPIView(RetrieveUpdateAPIView):
-    """
-    close chat room by creator view 
-    it is a base class for other views to inherit 
-    """
-    permission_classes = None
-    serializer_class = None
-    queryset = ChatRoom.objects.all()
-    lookup_field = 'id'
-    closed_exception_message = str()
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if instance.closed:
-            raise exceptions.NotAcceptable(self.closed_exception_message)
-        instance.close()
-        return Response({"status": "Done"})
-
-
-class AddNewMemberAPIView(RetrieveUpdateAPIView):
+class AddNewMemberAPIView(UpdateAPIView):
     """
     add new member to chat room
     it is a base class for other views to inherit 
@@ -74,27 +61,30 @@ class AddNewMemberAPIView(RetrieveUpdateAPIView):
         serializer = self.get_serializer(
             instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        username = serializer.initial_data['members'][0]['username']
+        _username = serializer.validated_data.get('some_members')['username']
         try:
             user = UserModel.objects.get(
-                username=username, is_staff=self.is_staff_filter)
+                username=_username, is_staff=self.is_staff_filter)
         except:
             raise Http404
         # add new member
         result = instance.add_new_member(user)
         if not result:
+            """
+            user has removed by admin or already has joined the group
+            """
             raise exceptions.NotAcceptable(
-                {"members": "Member already exists."})
+                {"member": "User can't rejoin this group."})
         return Response({"status": "Done"})
 
 
-class MemberManagementAPIView(RetrieveUpdateAPIView):
+class MemberManagementAPIView(UpdateAPIView):
     """
     view to manage members
     it is a base class for other views to inherit 
     """
     permission_classes = None
-    serializer_class = WritableSingleGroupMemberSerializer
+    serializer_class = GroupSingleMemberSerializer
     queryset = ChatRoom.objects.filter(
         type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
     lookup_field = 'id'
@@ -104,9 +94,9 @@ class MemberManagementAPIView(RetrieveUpdateAPIView):
     def get_object(self):
         return super().get_object()
 
-    def action(self, *args, **kwargs):
+    def operation(self, *args, **kwargs):
         """
-        override view action
+        override view operation
         """
         pass
 
@@ -116,13 +106,13 @@ class MemberManagementAPIView(RetrieveUpdateAPIView):
         serializer = self.get_serializer(
             instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        username = serializer.initial_data['members'][0]['username']
+        _username = serializer.validated_data.get('some_members')['username']
         try:
-            member = UserModel.objects.get(username=username)
+            member = UserModel.objects.get(username=_username)
         except:
             raise Http404
         # promote member
-        result = self.action(member)
+        result = self.operation(member)
         if not result:
             raise exceptions.NotAcceptable({"members": self.not_found_message})
         return Response({"status": "Done"})
@@ -135,9 +125,18 @@ class TicketViewSet(ModelViewSet):
     """
     viewset for ticket 
     """
-    permission_classes = [IsCreator | IsStaffMember]
+    permission_classes = [IsAuthenticated]
     serializer_class = TicketSerializer
     queryset = ChatRoom.objects.filter(type='USER_TICKET')
+
+    def get_permissions(self):
+        if self.action == 'create':
+            self.permission_classes = [IsAuthenticated]
+        elif self.action in ['destroy', 'update']:
+            self.permission_classes = [IsCreator]
+        elif self.action in ['retrieve', 'list']:
+            self.permission_classes = [IsCreator | (IsMember & IsStaff)]
+        return super().get_permissions()
 
     @lru_cache(maxsize=None)
     def get_object(self):
@@ -160,8 +159,8 @@ class TicketViewSet(ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         ticket = ChatRoom.objects.create_ticket(
-            name=serializer.validated_data['name'],
-            priority=serializer.validated_data['priority'],
+            name=serializer.validated_data.get('name'),
+            priority=serializer.validated_data.get('priority'),
             creator=request.user)
         headers = self.get_success_headers(serializer.data)
         return Response(self.get_serializer(ticket).data, status=status.HTTP_201_CREATED, headers=headers)
@@ -173,21 +172,28 @@ class TicketViewSet(ModelViewSet):
         return super().update(request, *args, **kwargs)
 
 
-class CloseTicketAPIView(CloseChatRoomAPIView):
+class CloseLockTicketAPIView(UpdateAPIView):
     """
-    close ticket by creator view 
+    close and lock ticket by creator view 
     """
     permission_classes = [IsCreator]
-    serializer_class = CloseTicketSerializer
+    serializer_class = ChatRoomSerializer
     queryset = ChatRoom.objects.filter(type='USER_TICKET')
-    closed_exception_message = "Ticket has been closed."
+    lookup_field = 'id'
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.closed:
+            raise exceptions.NotAcceptable("Ticket has been closed.")
+        instance.close_lock()
+        return Response({"status": "Done"})
 
 
 class AssignStaffToTicketAPIView(AddNewMemberAPIView):
     """
     assign another staff to ticket by staff
     """
-    permission_classes = [IsStaffMemberWithAction]
+    permission_classes = [IsMember & IsStaff]
     serializer_class = AssignStaffToTicketSerializer
     queryset = ChatRoom.objects.filter(type='USER_TICKET')
     closed_exception_message = "Ticket has been closed."
@@ -204,7 +210,7 @@ class PrivateChatViewSet(CreateModelMixin,
     """
     viewset for private chat 
     """
-    permission_classes = [IsMember]
+    permission_classes = [IsMemberNotStaff]
     serializer_class = PrivateChatSerializer
     queryset = ChatRoom.objects.filter(type='PRIVATE_CHAT')
 
@@ -224,43 +230,43 @@ class PrivateChatViewSet(CreateModelMixin,
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        username = serializer.initial_data['members'][0]['username']
+        _username = serializer.validated_data.get('some_members')['username']
         try:
-            contact = UserModel.objects.get(
-                username=username, is_staff=False)
+            _contact = UserModel.objects.get(
+                username=_username, is_staff=False)
         except:
             raise Http404
-        if request.user == contact:
+        if request.user == _contact:
             raise exceptions.NotAcceptable("Self-chat is not allowed.")
         private_chat = ChatRoom.objects.create_private_chat(
             creator=request.user,
-            contact=contact)
+            contact=_contact)
         headers = self.get_success_headers(serializer.data)
         return Response(self.get_serializer(private_chat).data, status=status.HTTP_201_CREATED, headers=headers)
 
 
-class BlockUserAPIView(RetrieveUpdateAPIView):
+class BlockUserAPIView(UpdateAPIView):
     """
-    block user by closing private chat
+    block user by closing and locking private chat
     """
-    permission_classes = [IsMemberWithAction]
-    serializer_class = BlockUserSerializer
+    permission_classes = [IsMemberNotStaff]
+    serializer_class = ChatRoomSerializer
     queryset = ChatRoom.objects.filter(type='PRIVATE_CHAT')
     lookup_field = 'id'
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         # close private chat
-        instance.close()
+        instance.close_lock()
         return Response({"status": "Done"})
 
 
-class UnBlockUserAPIView(RetrieveUpdateAPIView):
+class UnBlockUserAPIView(UpdateAPIView):
     """
     unblock user by opening private chat
     """
-    permission_classes = [IsMemberWithAction]
-    serializer_class = BlockUserSerializer
+    permission_classes = [IsMemberNotStaff]
+    serializer_class = ChatRoomSerializer
     queryset = ChatRoom.objects.filter(type='PRIVATE_CHAT')
     lookup_field = 'id'
 
@@ -282,7 +288,7 @@ class GroupViewSet(CreateModelMixin,
     """
     viewset for groups 
     """
-    permission_classes = [IsMember]
+    permission_classes = [IsAuthenticated]
     serializer_class = CreateGroupSerializer
     queryset = ChatRoom.objects.filter(
         type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
@@ -290,10 +296,10 @@ class GroupViewSet(CreateModelMixin,
     def get_permissions(self):
         if self.action == 'destroy':
             self.permission_classes = [IsCreator | IsStaff]
-        if self.action == 'create':
+        elif self.action == 'create':
             self.permission_classes = [IsAuthenticatedNotStaff]
-        if self.action in ['retrieve', 'list']:
-            self.permission_classes = [IsMember]
+        elif self.action in ['retrieve', 'list']:
+            self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
     def get_serializer_class(self):
@@ -316,50 +322,60 @@ class GroupViewSet(CreateModelMixin,
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # get members usernames
-        usernames = [member['username']
-                     for member in serializer.initial_data['members']]
-        members = list(UserModel.objects.filter(
-            username__in=usernames, is_staff=False))
+        _usernames = [member['username']
+                      for member in serializer.validated_data.get('some_members')]
+        _members = list(UserModel.objects.filter(
+            username__in=_usernames, is_staff=False))
         ticket = ChatRoom.objects.create_group(
-            name=serializer.validated_data['name'],
+            name=serializer.validated_data.get('name'),
             creator=request.user,
-            members=members,
-            type=serializer.validated_data['type'],
+            members=_members,
+            type=serializer.validated_data.get('type'),
         )
         headers = self.get_success_headers(serializer.data)
         return Response(self.get_serializer(ticket).data, status=status.HTTP_201_CREATED, headers=headers)
 
 
-class GroupUpdateAPIView(RetrieveUpdateAPIView):
+class GroupUpdateAPIView(UpdateAPIView):
     """
     update group view
     """
-    permission_classes = [IsAdmin | IsCreator]
+    # permission_classes = [IsAdmin | IsCreator]
+    permission_classes = [IsAdmin_CanUpdate | IsCreator]
     serializer_class = UpdateGroupSerializer
     queryset = ChatRoom.objects.filter(
         type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
     lookup_field = 'id'
 
 
-class CloseGroupAPIView(CloseChatRoomAPIView):
+class CloseGroupAPIView(UpdateAPIView):
     """
     close group by creator view 
     the group will not accept new member
     """
-    permission_classes = [IsAdmin | IsCreator]
-    serializer_class = ReadOnlyGroupSerializer
+    # permission_classes = [IsAdmin | IsCreator]
+    permission_classes = [IsAdmin_CanClose | IsCreator]
+    serializer_class = ChatRoomSerializer
     queryset = ChatRoom.objects.filter(
         type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
-    closed_exception_message = "Group has been closed."
+    lookup_field = 'id'
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.closed:
+            raise exceptions.NotAcceptable("Group has been closed.")
+        instance.close()
+        return Response({"status": "Done"})
 
 
-class Un_LockGroupAPIView(RetrieveUpdateAPIView):
+class Un_LockGroupAPIView(UpdateAPIView):
     """
     lock and unlock the group by admin
     no one can send message in group except admin
     """
-    permission_classes = [IsAdmin | IsCreator]
-    serializer_class = ReadOnlyGroupSerializer
+    # permission_classes = [IsAdmin | IsCreator]
+    permission_classes = [IsAdmin_CanLock | IsCreator]
+    serializer_class = ChatRoomSerializer
     queryset = ChatRoom.objects.filter(
         type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
     lookup_field = 'id'
@@ -367,7 +383,7 @@ class Un_LockGroupAPIView(RetrieveUpdateAPIView):
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         # change group read only status
-        instance.change_read_only()
+        instance.lock()
         return Response({"status": "Done"})
 
 
@@ -376,7 +392,7 @@ class JoinPublicGroupAPIView(RetrieveUpdateAPIView):
     join public group view
     """
     permission_classes = [IsAuthenticatedNotStaff]
-    serializer_class = ReadOnlyGroupSerializer
+    serializer_class = ChatRoomSerializer
     queryset = ChatRoom.objects.filter(type='PUBLIC_GROUPE')
     lookup_field = 'id'
 
@@ -388,27 +404,30 @@ class JoinPublicGroupAPIView(RetrieveUpdateAPIView):
         # join member to group
         result = instance.join_public_group(request.user)
         if not result:
+            """
+            user has removed by admin or already has joined the group
+            """
             raise exceptions.NotAcceptable(
-                {"members": "You have already joined this group."})
+                {"members": "You can't rejoin this group."})
         return Response({"status": "Done"})
 
 
-class LeaveGroupAPIView(RetrieveUpdateAPIView):
+class LeaveGroupAPIView(UpdateAPIView):
     """
     user leave group view
     """
-    permission_classes = [IsMemberWithAction]
-    serializer_class = ReadOnlyGroupSerializer
-    queryset = ChatRoom.objects.filter(
-        type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
-    lookup_field = 'id'
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChatRoomSerializer
+    queryset = ChatMember.objects.select_related('user')
+    lookup_field = 'chat_room_id'
+
+    def get_queryset(self):
+        queryset = self.queryset.filter(user=self.request.user)
+        return queryset
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        # leave member from group
-        result = instance.leave_chat_room(request.user)
-        if not result:
-            raise exceptions.NotAcceptable({"members": "Member not found."})
+        instance.delete()
         return Response({"status": "Done"})
 
 
@@ -416,8 +435,9 @@ class AddMemberToGroupAPIView(AddNewMemberAPIView):
     """
     add new member to group by admin
     """
-    permission_classes = [IsAdmin | IsCreator]
-    serializer_class = WritableSingleGroupMemberSerializer
+    # permission_classes = [IsAdmin | IsCreator]
+    permission_classes = [IsAdmin_CanAdd | IsCreator]
+    serializer_class = GroupSingleMemberSerializer
     queryset = ChatRoom.objects.filter(
         type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
     lookup_field = 'id'
@@ -425,14 +445,15 @@ class AddMemberToGroupAPIView(AddNewMemberAPIView):
     is_staff_filter = False
 
 
-class RemoveMemberFromGroupAPIView(RetrieveUpdateAPIView):
+class RemoveMemberFromGroupAPIView(MemberManagementAPIView):
     """
     remove a member from group by admin
     """
-    permission_classes = [IsAdmin | IsCreator]
+    # permission_classes = [IsAdmin | IsCreator]
+    permission_classes = [IsAdmin_CanRemove | IsCreator]
     not_found_message = "Member not found."
 
-    def action(self, *args, **kwargs):
+    def operation(self, *args, **kwargs):
         return self.get_object().remove_member(*args, **kwargs)
 
 
@@ -443,7 +464,7 @@ class PromoteMemberAPIView(MemberManagementAPIView):
     permission_classes = [IsCreator]
     not_found_message = "Member not found."
 
-    def action(self, *args, **kwargs):
+    def operation(self, *args, **kwargs):
         return self.get_object().promote_member(*args, **kwargs)
 
 
@@ -454,5 +475,59 @@ class DemoteAdminAPIView(MemberManagementAPIView):
     permission_classes = [IsCreator]
     not_found_message = "Admin not found."
 
-    def action(self, *args, **kwargs):
+    def operation(self, *args, **kwargs):
         return self.get_object().demote_admin(*args, **kwargs)
+
+
+class MemberActionPermissionAPIView(RetrieveUpdateAPIView):
+    """
+    view for a member with action permissions 
+    """
+    permission_classes = [IsCreator]
+    serializer_class = MemberSerializer
+    queryset = ChatRoom.objects.filter(
+        type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
+    lookup_field = 'id'
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.member.role == "member":
+            serializer = MemberSerializer(instance)
+        else:
+            serializer = AdminSerializer(instance)
+        return Response(serializer.data)
+
+    def get_object(self):
+        queryset = self.filter_queryset(self.get_queryset())
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
+        obj = get_object_or_404(queryset, **filter_kwargs)
+        self.check_object_permissions(self.request, obj)
+        result = obj.select_member(self.kwargs['user_id'])
+        if not result:
+            raise Http404
+        return obj
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        if instance.member.role == "member":
+            serializer = MemberSerializer(
+                instance, data=request.data, partial=partial)
+        else:
+            serializer = AdminSerializer(
+                instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        _permission = [k for k, v in serializer.initial_data.get(
+            "permission").items() if v]
+        _action_permission = permission(*_permission)
+        if _action_permission < permission("add_member"):
+            """
+            creator downgrades user permissions under than admin level
+            """
+            ChatMember.objects.filter(chat_room_id=self.kwargs['id'], user_id=self.kwargs['user_id']).\
+                update(action_permission=_action_permission, is_admin=False)
+        else:
+            ChatMember.objects.filter(chat_room_id=self.kwargs['id'], user_id=self.kwargs['user_id']).\
+                update(action_permission=_action_permission)
+        return Response({"status": "Done"})
