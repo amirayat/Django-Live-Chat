@@ -28,7 +28,6 @@ from chat.permissions import (IsAdmin_CanAdd,
                               IsAdmin_CanRemove,
                               IsAdmin_CanUpdate,
                               IsCreator,
-                              IsAdmin,
                               IsMember,
                               IsMemberNotStaff,
                               IsAuthenticatedNotStaff,
@@ -340,7 +339,6 @@ class GroupUpdateAPIView(UpdateAPIView):
     """
     update group view
     """
-    # permission_classes = [IsAdmin | IsCreator]
     permission_classes = [IsAdmin_CanUpdate | IsCreator]
     serializer_class = UpdateGroupSerializer
     queryset = ChatRoom.objects.filter(
@@ -353,7 +351,6 @@ class CloseGroupAPIView(UpdateAPIView):
     close group by creator view 
     the group will not accept new member
     """
-    # permission_classes = [IsAdmin | IsCreator]
     permission_classes = [IsAdmin_CanClose | IsCreator]
     serializer_class = ChatRoomSerializer
     queryset = ChatRoom.objects.filter(
@@ -373,7 +370,6 @@ class Un_LockGroupAPIView(UpdateAPIView):
     lock and unlock the group by admin
     no one can send message in group except admin
     """
-    # permission_classes = [IsAdmin | IsCreator]
     permission_classes = [IsAdmin_CanLock | IsCreator]
     serializer_class = ChatRoomSerializer
     queryset = ChatRoom.objects.filter(
@@ -435,7 +431,6 @@ class AddMemberToGroupAPIView(AddNewMemberAPIView):
     """
     add new member to group by admin
     """
-    # permission_classes = [IsAdmin | IsCreator]
     permission_classes = [IsAdmin_CanAdd | IsCreator]
     serializer_class = GroupSingleMemberSerializer
     queryset = ChatRoom.objects.filter(
@@ -449,7 +444,6 @@ class RemoveMemberFromGroupAPIView(MemberManagementAPIView):
     """
     remove a member from group by admin
     """
-    # permission_classes = [IsAdmin | IsCreator]
     permission_classes = [IsAdmin_CanRemove | IsCreator]
     not_found_message = "Member not found."
 
