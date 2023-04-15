@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework import routers
 from chat.views import (AddMemberToGroupAPIView,
-                        BlockUserAPIView,
+                        BlockUserAPIView, FileUploadView,
                         Un_LockGroupAPIView,
                         CloseGroupAPIView,
                         DemoteAdminAPIView,
@@ -28,6 +28,9 @@ provate_chat_router.register(r'', PrivateChatViewSet)
 group_router = routers.DefaultRouter()
 group_router.register(r'', GroupViewSet)
 
+upload_router = routers.DefaultRouter()
+upload_router.register(r'', FileUploadView)
+
 
 urlpatterns = [
     path('ticket/', include(ticket_router.urls)),
@@ -50,4 +53,6 @@ urlpatterns = [
     path('group/<int:chat_room_id>/leave/', LeaveGroupAPIView.as_view()),
 
     path('group/<int:id>/permission/<int:user_id>/', MemberActionPermissionAPIView.as_view()),
+
+    path('upload/', include(upload_router.urls)),
 ]
