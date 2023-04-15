@@ -1,7 +1,9 @@
-from functools import lru_cache
+import time
+import random
 from typing import TypeVar
-from django.utils import timezone
+from functools import lru_cache
 from django.db import models
+from django.utils import timezone
 from django.db.models import Count, Q, F
 from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
@@ -11,6 +13,7 @@ from chat.permissions import (permission,
                               admin_permissions,
                               member_permissions,
                               no_permission)
+from chat.utils import VIDEO_FORMAT, IMAGE_FORMATS, capture_video, blur_image
 
 
 UserModel = get_user_model()
@@ -100,8 +103,14 @@ class ChatRoomManager(RootModelManager):
         """
         _group = super().create(name=name, type=type)
         # create members
-        _all_members = [ChatMember(is_creator=True, is_admin=False, chat_room=_group, user=creator, action_permission=creator_permissions())] + \
-            [ChatMember(is_creator=False, chat_room=_group, user=member)
+        _all_members = [ChatMember(is_creator=True,
+                                   is_admin=False,
+                                   chat_room=_group,
+                                   user=creator,
+                                   action_permission=creator_permissions())] + \
+            [ChatMember(is_creator=False,
+                        chat_room=_group,
+                        user=member)
              for member in members if member.id != creator.id]
         ChatMember.objects.bulk_create(_all_members)
         return _group
@@ -129,7 +138,7 @@ class ChatRoom(RootModel):
         ("PRIVATE_CHAT", "PRIVATE_CHAT"),
     )
 
-    photo = models.ImageField(upload_to='files', null=True)
+    photo = models.ImageField(upload_to='group_picture', null=True)
     name = models.CharField(max_length=32)
     closed = models.BooleanField(default=False)
     closed_at = models.DateTimeField(null=True)
@@ -467,7 +476,9 @@ class NonRemovedMemberManager(models.Manager):
     """
 
     def get_queryset(self):
-        return super().get_queryset().annotate(res=F('action_permission') % permission("join_group")).filter(res=0)
+        return super().get_queryset().\
+            annotate(res=F('action_permission') % permission("join_group")).\
+            filter(res=0)
 
 
 class ChatMember(RootModel):
@@ -510,3 +521,53 @@ class ChatMember(RootModel):
             models.UniqueConstraint(
                 fields=['chat_room', 'user'], name='unique_user_room')
         ]
+
+
+class FileUpload(RootModel):
+    """
+    chat file upload
+    """
+
+    FILE_TYPE = (
+        ("VOICE", "VOICE"),
+        ("FILE", "FILE"),
+        ("VIDEO", "VIDEO"),
+        ("IMAGE", "IMAGE"),
+    )
+
+    user = models.ForeignKey(UserModel, related_name=_(
+        'user_upload'), on_delete=models.CASCADE)
+    file = models.FileField(upload_to=_('file'))
+    file_pic = models.ImageField(upload_to=_('file_picture'), null=True)
+    file_type = models.CharField(max_length=5, choices=FILE_TYPE)
+
+    @property
+    def size(self) -> int:
+        """
+        return file size
+        """
+        return self.file.size
+
+    @property
+    def format(self) -> str:
+        """
+        return file format
+        """
+        return self.file.name.split(".")[-1]
+
+    @property
+    def name(self) -> str:
+        """
+        return file name
+        """
+        return self.file_type + '_' + \
+            str(round(time.time())) + '_' + \
+            str(random.randrange(10**6, 10**7-1))
+
+    def save(self, *args, **kwargs) -> None:
+        self.file.name = self.name + '.' + self.format
+        self.file_pic.name = self.name + '.png'
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = 'chat_uploads'
