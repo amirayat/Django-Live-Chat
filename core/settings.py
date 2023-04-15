@@ -34,7 +34,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = ast.literal_eval(os.getenv('DEBUG'))
 
 ALLOWED_HOSTS = ast.literal_eval(os.getenv('ALLOWED_HOSTS'))
-CSRF_TRUSTED_ORIGINS = ast.literal_eval(os.getenv('CSRF_TRUSTED_ORIGINS'))
+CSRF_TRUSTED_ORIGINS = ast.literal_eval(os.getenv('TRUSTED_ORIGINS'))
 
 
 # Application definition
@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 
     # third-party apps
     'corsheaders',
+    'minio_storage',
     'channels',
     'django_eventstream',
     'rest_framework',
@@ -288,5 +289,22 @@ EVENTSTREAM_ALLOW_CREDENTIALS = True
 EVENTSTREAM_ALLOW_HEADERS = 'Authorization'
 EVENTSTREAM_CHANNELMANAGER_CLASS = 'core.permissions.ChannelManager'
 
-# max number of message in client chat page
-MESSAGE_LIMITE = 10
+
+# https://pypi.org/project/django-cors-headers/
+# For demo purposes only. Use a white list in the real world.
+CORS_ALLOWED_ORIGINS = ast.literal_eval(os.getenv('TRUSTED_ORIGINS'))
+
+
+# https://django-minio-storage.readthedocs.io/en/latest/
+DEFAULT_FILE_STORAGE = 'minio_storage.storage.MinioMediaStorage'
+STATICFILES_STORAGE = 'minio_storage.storage.MinioStaticStorage'
+MINIO_STORAGE_ENDPOINT = os.getenv('MINIO_STORAGE_ENDPOINT')
+MINIO_STORAGE_ACCESS_KEY = os.getenv('MINIO_STORAGE_ACCESS_KEY')
+MINIO_STORAGE_SECRET_KEY = os.getenv('MINIO_STORAGE_SECRET_KEY')
+MINIO_STORAGE_USE_HTTPS = ast.literal_eval(os.getenv('MINIO_STORAGE_USE_HTTPS'))
+MINIO_STORAGE_MEDIA_BUCKET_NAME = os.getenv('MINIO_STORAGE_MEDIA_BUCKET_NAME')
+MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
+MINIO_STORAGE_STATIC_BUCKET_NAME = os.getenv('MINIO_STORAGE_STATIC_BUCKET_NAME')
+MINIO_STORAGE_AUTO_CREATE_STATIC_BUCKET = True
+MINIO_STORAGE_MEDIA_URL = os.getenv('MINIO_STORAGE_MEDIA_URL')
+MINIO_STORAGE_STATIC_URL = os.getenv('MINIO_STORAGE_STATIC_URL')
