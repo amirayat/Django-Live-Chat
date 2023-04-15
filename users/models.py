@@ -13,7 +13,7 @@ class ChatUser(AbstractUser):
         self._action_permission = no_permission()
         super().__init__(*args, **kwargs)
 
-    photo = models.ImageField(upload_to='files', null=True)
+    photo = models.ImageField(upload_to='user_picture', null=True)
 
     @property
     def role(self):
