@@ -9,7 +9,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.permissions import IsAdminUser as IsStaff
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, ListModelMixin
-from chat.models import ChatRoom, ChatMember
+from chat.models import ChatRoom, ChatMember, FileUpload
 from chat.serializers import (ChatRoomSerializer,
                               ListGroupSerializer,
                               ListPrivateChatSerializer,
@@ -21,7 +21,7 @@ from chat.serializers import (ChatRoomSerializer,
                               AssignStaffToTicketSerializer,
                               UpdateGroupSerializer,
                               AdminSerializer,
-                              MemberSerializer)
+                              MemberSerializer, UploadSerializer)
 from chat.permissions import (IsAdmin_CanAdd,
                               IsAdmin_CanClose,
                               IsAdmin_CanLock,
@@ -525,3 +525,18 @@ class MemberActionPermissionAPIView(RetrieveUpdateAPIView):
             ChatMember.objects.filter(chat_room_id=self.kwargs['id'], user_id=self.kwargs['user_id']).\
                 update(action_permission=_action_permission)
         return Response({"status": "Done"})
+
+
+class FileUploadView(CreateModelMixin,
+                     RetrieveModelMixin,
+                     DestroyModelMixin,
+                     GenericViewSet):
+    """
+    user uploads a file
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UploadSerializer
+    queryset = FileUpload.objects.all()
+
+    def get_queryset(self):
+        return super().get_queryset().filter(user=self.request.user)
