@@ -6,7 +6,7 @@ from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, generate_file_pic
 from chat.models import (ChatRoom,
                          ChatMember,
                          FileUpload,
-                         PredefinedMessage)
+                         PredefinedMessage, Report)
 
 
 UserModel = get_user_model()
@@ -430,6 +430,9 @@ class UploadSerializer(serializers.ModelSerializer):
         ]
 
 
+###
+# Predefined Message
+###
 class PredefinedMessageSerializer(serializers.ModelSerializer):
     """
     serializer class for predefined messages
@@ -453,3 +456,22 @@ class PredefinedMessageSerializer(serializers.ModelSerializer):
             "text",
             "file"
         ]
+
+
+###
+# Report
+###
+class ReportSerializer(serializers.ModelSerializer):
+    """
+    serializer class for reports
+    """
+
+    class Meta:
+        model = Report
+        read_only_fields = [
+            "id",
+            "message",
+            "reporter",
+            "group"
+        ]
+        fields = read_only_fields
