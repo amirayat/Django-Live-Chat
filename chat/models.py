@@ -596,3 +596,22 @@ class PredefinedMessage(RootModel):
 
     class Meta:
         db_table = 'predefined_messages'
+
+
+class Report(RootModel):
+    """
+    class model for report message
+    """
+    message = models.ForeignKey(
+        PredefinedMessage, related_name=_('report_message'), on_delete=models.CASCADE)
+    reporter = models.ForeignKey(UserModel, related_name=_(
+        'reporter'), on_delete=models.DO_NOTHING)
+    group = models.ForeignKey(UserModel, related_name=_(
+        'group'), on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'reports'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['reporter', 'group'], name='unique_reporter_group')
+        ]
