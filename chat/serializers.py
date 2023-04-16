@@ -95,12 +95,12 @@ class TicketSerializer(ChatRoomSerializer):
     serializer for tickets
     recieve [name,priority] from creator
     """
-    TICKET_PRIORITY = (
+    ticket_priority = (
         ("LOW", "LOW"),
         ("MEDIUM", "MEDIUM"),
         ("HIGH", "HIGH"),
     )
-    priority = serializers.ChoiceField(default="LOW", choices=TICKET_PRIORITY)
+    priority = serializers.ChoiceField(default="LOW", choices=ticket_priority)
 
     class Meta:
         model = ChatRoom
@@ -197,11 +197,11 @@ class CreateGroupSerializer(ChatRoomMultiMemberSerializer):
     serializer for group creation
     recieve [photo,name,type,members]
     """
-    GROUP_TYPE = (
+    group_type = (
         ("PUBLIC_GROUPE", "PUBLIC_GROUPE"),
         ("PRIVATE_GROUPE", "PRIVATE_GROUPE"),
     )
-    type = serializers.ChoiceField(default="PUBLIC_GROUPE", choices=GROUP_TYPE)
+    type = serializers.ChoiceField(default="PUBLIC_GROUPE", choices=group_type)
 
     class Meta:
         model = ChatRoom
@@ -224,11 +224,11 @@ class UpdateGroupSerializer(ChatRoomSerializer):
     serializer to update group
     updatable fields: photo, name, type  
     """
-    GROUP_TYPE = (
+    group_type = (
         ("PUBLIC_GROUPE", "PUBLIC_GROUPE"),
         ("PRIVATE_GROUPE", "PRIVATE_GROUPE"),
     )
-    type = serializers.ChoiceField(default="PUBLIC_GROUPE", choices=GROUP_TYPE)
+    type = serializers.ChoiceField(default="PUBLIC_GROUPE", choices=group_type)
 
     class Meta:
         model = ChatRoom
