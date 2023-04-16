@@ -1,8 +1,9 @@
-import os
 import io
 import cv2
+import imageio.v3 as iio
 from PIL import Image, ImageOps
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.storage import FileSystemStorage
 
 
 image_formats = ["jpg", "jpeg", "png", "gif", "tiff"]
@@ -14,24 +15,19 @@ IMAGE_FORMATS = list()
 for format in image_formats:
     IMAGE_FORMATS.extend([format, format.upper()])
 
-VIDEO_FORMAT = list()
+VIDEO_FORMATS = list()
 for format in video_formats:
-    VIDEO_FORMAT.extend([format, format.upper()])
+    VIDEO_FORMATS.extend([format, format.upper()])
 
-AUDIO_FORMAT = list()
+AUDIO_FORMATS = list()
 for format in audio_formats:
-    AUDIO_FORMAT.extend([format, format.upper()])
+    AUDIO_FORMATS.extend([format, format.upper()])
 
 
-def blur_image(file: InMemoryUploadedFile) -> InMemoryUploadedFile:
+def resize_image(image: Image) -> Image:
     """
-    blur image and resize
-    https://www.tutorialspoint.com/python_pillow/python_pillow_blur_an_image.htm
-    https://stackoverflow.com/questions/273946/how-do-i-resize-an-image-using-pil-and-maintain-its-aspect-ratio
-    https://stackoverflow.com/questions/46944107/how-to-crop-an-image-from-the-center-with-certain-dimensions
+    resize pillow image
     """
-    image = Image.open(file)
-    # resize image
     height, width = image.size
     new_width = 50
     new_height = int(new_width * height / width)
@@ -39,32 +35,73 @@ def blur_image(file: InMemoryUploadedFile) -> InMemoryUploadedFile:
     wdif, hdif = 0, (new_height-new_width)//2
     border = wdif, hdif, wdif, hdif  # left, top, right, bottom
     image = ImageOps.crop(image, border)
-    # convert to django image field
+    return image
+
+
+def pillow_to_iobytes(image: Image) -> io.BytesIO:
+    """
+    convert pillow image to io bytes
+    """
     output = io.BytesIO()
     image.save(output, format='PNG', quality=85)
     output.seek(0)
-    return InMemoryUploadedFile(file=output,
-                                name=file.name,
-                                size=output.getbuffer().nbytes,
+    return output
+
+
+def iobytes_to_InMemoryUploadedFile(iobytes: io.BytesIO) -> InMemoryUploadedFile:
+    """
+    convert io bytes to django InMemoryUploadedFile
+    """
+    return InMemoryUploadedFile(file=iobytes,
+                                name='_',
+                                size=iobytes.getbuffer().nbytes,
                                 content_type='image/png',
                                 charset=None,
                                 content_type_extra={},
                                 field_name='file_pic')
 
 
-def capture_video(vid_path: str) -> str():
+def capture_video_inmemory(file: InMemoryUploadedFile) -> Image:
     """
-    take a capture from video and blur it
-    https://stackoverflow.com/questions/30136257/how-to-get-image-from-video-using-opencv-python
+    capture first frame of an in memory video 
+    it takes too long time to convert video from bytes to numpy arrey 
+    and then get first slice  
     """
-    dir_name, base_name = os.path.split(vid_path)
-    filename, file_format = os.path.splitext(vid_path)
-    img_name = base_name.replace(file_format, ".png")
-    img_path = os.path.join(dir_name, img_name)
-    vidcap = cv2.VideoCapture(vid_path)
-    success, image = vidcap.read()
+    file_format = file.name.split(".")[-1]
+    first_frame = iio.imread(file.file, format_hint='.'+file_format)[0]
+    return Image.fromarray(first_frame)
+
+
+def capture_video_temporary(file: InMemoryUploadedFile) -> Image:
+    """
+    save in-memory file on disk temporary storage
+    capture first frame of the temporary file video 
+    """
+    FileSystemStorage(location="/tmp").save(file.name, file)
+    vidcap = cv2.VideoCapture("/tmp/"+file.name)
+    success, first_frame = vidcap.read()
     if success:
-        cv2.imwrite(img_path, image)
-    cv2.destroyAllWindows()
-    vidcap.release()
-    return blur_image(img_path)
+        image = Image.fromarray(first_frame)
+        cv2.destroyAllWindows()
+        vidcap.release()
+        return image
+
+
+def generate_file_pic(file: InMemoryUploadedFile) -> InMemoryUploadedFile:
+    """
+    to generate file_pic for file
+    """
+    file_format = file.name.split(".")[-1]
+    try:
+        if file_format in IMAGE_FORMATS:
+            image = Image.open(file)
+        elif file_format in VIDEO_FORMATS:
+            # image = capture_video_inmemory(file)
+            image = capture_video_temporary(file)
+        image = resize_image(image)
+        iobytes = pillow_to_iobytes(image)
+        return iobytes_to_InMemoryUploadedFile(iobytes)
+    except:
+        return None
+
+
