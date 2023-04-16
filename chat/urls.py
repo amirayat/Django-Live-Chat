@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework import routers
 from chat.views import (AddMemberToGroupAPIView,
-                        BlockUserAPIView, FileUploadView, PredefinedMessageViewSet,
+                        BlockUserAPIView, FileUploadView, PredefinedMessageViewSet, ReportViewSet,
                         Un_LockGroupAPIView,
                         CloseGroupAPIView,
                         DemoteAdminAPIView,
@@ -35,6 +35,9 @@ upload_router.register(r'', FileUploadView)
 predefined_messages_router = routers.DefaultRouter()
 predefined_messages_router.register(r'', PredefinedMessageViewSet)
 
+report_router = routers.DefaultRouter()
+report_router.register(r'', ReportViewSet)
+
 
 urlpatterns = [
     path('ticket/<int:id>/close/', CloseLockTicketAPIView.as_view()),
@@ -60,4 +63,6 @@ urlpatterns = [
     path('group/<int:id>/permission/<int:user_id>/', MemberActionPermissionAPIView.as_view()),
 
     path('predefined_message/', include(predefined_messages_router.urls)),
+
+    path('report/', include(report_router.urls)),
 ]
