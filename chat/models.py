@@ -586,3 +586,13 @@ class FileUpload(RootModel):
         db_table = 'chat_uploads'
 
 
+class PredefinedMessage(RootModel):
+    """
+    class model for predefind message
+    """
+    text = models.TextField(null=True)
+    file = models.OneToOneField(
+        FileUpload, related_name=_('file_predefinedmessage'), on_delete=models.SET_NULL, null=True)
+
+    class Meta:
+        db_table = 'predefined_messages'
