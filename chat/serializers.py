@@ -1,7 +1,8 @@
+from django.conf import settings
 from rest_framework import serializers
 from chat.models import ChatRoom, ChatMember, FileUpload, UserModel
 from chat.permissions import permission_coefficients
-from chat.utils import IMAGE_FORMATS, VIDEO_FORMAT, AUDIO_FORMAT, blur_image
+from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, generate_file_pic
 
 
 class UserMemberSerializer(serializers.ModelSerializer):
@@ -395,27 +396,15 @@ class UploadSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         _file = attrs.get("file")
         _size = _file.size
-        _format = _file.name.split(".")[-1]
-        _file_type = attrs.get("file_type")
-        resp = {"file": list()}
-        if _size > 100*10**6:
-            resp['file'].append('File size exceeds 100m limite.')
-        if _file_type == "IMAGE" and _format not in IMAGE_FORMATS:
-            resp['file'].append('Wrong image file format.')
-        elif _file_type == "VIDEO" and _format not in VIDEO_FORMAT:
-            resp['file'].append('Wrong video file format.')
-        elif _file_type == "VOICE" and _format not in AUDIO_FORMAT:
-            resp['file'].append('Wrong audio file format.')
-        if resp['file']:
-            raise serializers.ValidationError(resp)
+        if _size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
+            raise serializers.ValidationError({'file':'File size exceeds the limite.'})
         return super().validate(attrs)
 
     def create(self, validated_data):
         _file = validated_data.get('file')
         _format = _file.name.split(".")[-1]
-        if _format in IMAGE_FORMATS:
-            _file_pic = blur_image(_file)
-            validated_data['file_pic'] = _file_pic
+        if _format in IMAGE_FORMATS+VIDEO_FORMATS:
+            validated_data['file_pic'] = generate_file_pic(_file)
         return super().create(validated_data)
 
     class Meta:
