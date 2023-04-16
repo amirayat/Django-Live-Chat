@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from rest_framework import status, exceptions
 from rest_framework.response import Response
-from rest_framework.generics import RetrieveUpdateAPIView, UpdateAPIView
+from rest_framework.generics import RetrieveUpdateAPIView, UpdateAPIView, ListAPIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.permissions import IsAdminUser as IsStaff
 from rest_framework.permissions import IsAuthenticated
@@ -152,7 +152,7 @@ class TicketViewSet(ModelViewSet):
         """
         only returns tickets of current request user
         """
-        return self.queryset.filter(chat_room_member__user=self.request.user)
+        return self.queryset.filter(chat_member__user=self.request.user)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -224,7 +224,7 @@ class PrivateChatViewSet(CreateModelMixin,
         """
         only private chats of request user
         """
-        return self.queryset.filter(chat_room_member__user=self.request.user)
+        return self.queryset.filter(chat_member__user=self.request.user)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -256,7 +256,7 @@ class BlockUserAPIView(UpdateAPIView):
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         # close private chat
-        instance.close_lock()
+        instance.lock()
         return Response({"status": "Done"})
 
 
@@ -279,6 +279,15 @@ class UnBlockUserAPIView(UpdateAPIView):
 ###
 # GROUPE
 ###
+class TopPublicGroupViewSet(ListAPIView):
+    """
+    list of top public groups
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = ListGroupSerializer
+    queryset = ChatRoom.objects.top_public_groups()
+
+
 class GroupViewSet(CreateModelMixin,
                    RetrieveModelMixin,
                    ListModelMixin,
@@ -315,7 +324,7 @@ class GroupViewSet(CreateModelMixin,
         """
         if self.request.user.is_staff:
             return self.queryset
-        return self.queryset.filter(chat_room_member__user=self.request.user, chat_room_member__is_deleted=False)
+        return self.queryset.filter(chat_member__user=self.request.user, chat_member__is_deleted=False)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
