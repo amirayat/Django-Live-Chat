@@ -11,14 +11,14 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.permissions import IsAdminUser as IsStaff
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, ListModelMixin
-from chat.models import ChatRoom, ChatMember, FileUpload, PredefinedMessage
+from chat.models import ChatRoom, ChatMember, FileUpload, PredefinedMessage, Report
 from chat.serializers import (ChatRoomSerializer,
                               ListGroupSerializer,
                               ListPrivateChatSerializer,
                               ListTicketSerializer,
                               GroupSingleMemberSerializer,
                               CreateGroupSerializer, PredefinedMessageSerializer,
-                              PrivateChatSerializer,
+                              PrivateChatSerializer, ReportSerializer,
                               TicketSerializer,
                               AssignStaffToTicketSerializer,
                               UpdateGroupSerializer,
@@ -561,7 +561,7 @@ class FileUploadView(CreateModelMixin,
 
 
 ###
-# FILE UPLOAD
+# Predefined Message
 ###
 class PredefinedMessageViewSet(ModelViewSet):
     """
@@ -572,5 +572,33 @@ class PredefinedMessageViewSet(ModelViewSet):
     queryset = PredefinedMessage.objects.all()
 
     @method_decorator(cache_page(60*60*168))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+
+###
+# Report
+###
+class ReportViewSet(ModelViewSet):
+    """
+    viewset for reports
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReportSerializer
+    queryset = Report.objects.all()
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return super().get_queryset()
+        return super().get_queryset().filter(reporter = self.request.user)
+
+    def get_permissions(self):
+        if self.action in ['retrieve', 'create', 'destroy', 'update']:
+            self.permission_classes = [IsAuthenticatedNotStaff]
+        elif self.action in ['list']:
+            self.permission_classes = [IsStaff]
+        return super().get_permissions()
+
+    @method_decorator(cache_page(60*60*2))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
