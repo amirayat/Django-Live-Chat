@@ -28,6 +28,13 @@ class ChatRoomManager(RootModelManager):
     custom manager for chat room
     """
 
+    def top_public_groups(self):
+        """
+        return top public groups
+        """
+        return super().get_queryset().filter(type='PUBLIC_GROUPE')\
+            .annotate(c=Count('chat_member')).order_by('-c')
+
     def update(self, **kwargs):
         """
         update only open chat rooms
@@ -125,13 +132,13 @@ class ChatRoom(RootModel):
         self._member = None
         super().__init__(*args, **kwargs)
 
-    TICKET_PRIORITY = (
+    ticket_priority = (
         ("LOW", "LOW"),
         ("MEDIUM", "MEDIUM"),
         ("HIGH", "HIGH"),
     )
 
-    CHATROOM_TYPE = (
+    chatroom_type = (
         ("USER_TICKET", "USER_TICKET"),
         ("PUBLIC_GROUPE", "PUBLIC_GROUPE"),
         ("PRIVATE_GROUPE", "PRIVATE_GROUPE"),
@@ -143,9 +150,9 @@ class ChatRoom(RootModel):
     closed = models.BooleanField(default=False)
     closed_at = models.DateTimeField(null=True)
     priority = models.CharField(
-        max_length=6, choices=TICKET_PRIORITY, default=None, null=True)
+        max_length=6, choices=ticket_priority, default=None, null=True)
     type = models.CharField(
-        max_length=14, choices=CHATROOM_TYPE, default="USER_TICKET")
+        max_length=14, choices=chatroom_type, default="USER_TICKET")
     read_only = models.BooleanField(default=False)
 
     objects = ChatRoomManager()
@@ -201,7 +208,7 @@ class ChatRoom(RootModel):
         """
         return list of all chat room users
         """
-        _query_set = self.chat_room_member.select_related("user")
+        _query_set = self.chat_member.select_related("user")
         for obj in _query_set:
             obj.user.role = obj.role
             obj.user.action_permission = obj.action_permission
@@ -231,7 +238,7 @@ class ChatRoom(RootModel):
         select a member
         """
         try:
-            self._member = self.chat_room_member.get(
+            self._member = self.chat_member.get(
                 chat_room_id=self.id,
                 user_id=user_id)
             return True
@@ -380,7 +387,7 @@ class ChatRoom(RootModel):
         """
         if self.is_public_group and not self.has_member(user):
             try:
-                self.chat_room_member(manager='non_removed_objects').update_or_create(
+                self.chat_member(manager='non_removed_objects').update_or_create(
                     chat_room_id=self.id,
                     user=user,
                     is_deleted=True,
@@ -402,7 +409,7 @@ class ChatRoom(RootModel):
             elif self.is_group:
                 _manager = 'non_removed_objects'
             try:
-                self.chat_room_member(manager=_manager).update_or_create(
+                self.chat_member(manager=_manager).update_or_create(
                     chat_room_id=self.id,
                     user=user,
                     is_deleted=True,
@@ -418,7 +425,7 @@ class ChatRoom(RootModel):
         removes member from chat room
         """
         if self.has_member(member):
-            self.chat_room_member.filter(
+            self.chat_member.filter(
                 chat_room_id=self.id,
                 user=member
             ).update(is_deleted=True, action_permission=no_permission())
@@ -430,7 +437,7 @@ class ChatRoom(RootModel):
         promote a member to admin level 
         """
         if self.has_member(member):
-            self.chat_room_member.filter(
+            self.chat_member.filter(
                 chat_room_id=self.id,
                 user=member
             ).update(is_admin=True, action_permission=admin_permissions())
@@ -442,7 +449,7 @@ class ChatRoom(RootModel):
         demote a admin to member level 
         """
         if self.has_admin(admin):
-            self.chat_room_member.filter(
+            self.chat_member.filter(
                 chat_room_id=self.id,
                 user=admin
             ).update(is_admin=False, action_permission=member_permissions())
@@ -450,10 +457,9 @@ class ChatRoom(RootModel):
         return False
 
     def save(self, *args, **kwargs) -> None:
-
         if self.closed_at and (self.is_ticket or self.is_group):
             """
-            update nothing for closed chat room of type ticket or group
+            save nothing for closed chat room of type ticket or group
             """
             self.closed = True
             return None
@@ -489,7 +495,7 @@ class ChatMember(RootModel):
     is_admin = models.BooleanField(default=False)
     action_permission = models.IntegerField(default=221)
     chat_room = models.ForeignKey(ChatRoom, related_name=_(
-        'chat_room_member'), on_delete=models.CASCADE)
+        'chat_member'), on_delete=models.CASCADE)
     user = models.ForeignKey(UserModel, related_name=_(
         'user_member'), on_delete=models.CASCADE)
 
@@ -578,3 +584,5 @@ class FileUpload(RootModel):
 
     class Meta:
         db_table = 'chat_uploads'
+
+
