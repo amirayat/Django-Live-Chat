@@ -13,7 +13,7 @@ from chat.permissions import (permission,
                               admin_permissions,
                               member_permissions,
                               no_permission)
-from chat.utils import VIDEO_FORMAT, IMAGE_FORMATS, capture_video, blur_image
+from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, AUDIO_FORMATS
 
 
 UserModel = get_user_model()
@@ -528,18 +528,10 @@ class FileUpload(RootModel):
     chat file upload
     """
 
-    FILE_TYPE = (
-        ("VOICE", "VOICE"),
-        ("FILE", "FILE"),
-        ("VIDEO", "VIDEO"),
-        ("IMAGE", "IMAGE"),
-    )
-
     user = models.ForeignKey(UserModel, related_name=_(
         'user_upload'), on_delete=models.CASCADE)
     file = models.FileField(upload_to=_('file'))
     file_pic = models.ImageField(upload_to=_('file_picture'), null=True)
-    file_type = models.CharField(max_length=5, choices=FILE_TYPE)
 
     @property
     def size(self) -> int:
@@ -556,6 +548,20 @@ class FileUpload(RootModel):
         return self.file.name.split(".")[-1]
 
     @property
+    def file_type(self) -> str:
+        """
+        return file type
+        """
+        if self.format in IMAGE_FORMATS:
+            return 'IMAGE'
+        elif self.format in VIDEO_FORMATS:
+            return 'VIDEO'
+        elif self.format in AUDIO_FORMATS:
+            return 'AUDIO'
+        else:
+            return 'FILE'
+
+    @property
     def name(self) -> str:
         """
         return file name
@@ -566,7 +572,8 @@ class FileUpload(RootModel):
 
     def save(self, *args, **kwargs) -> None:
         self.file.name = self.name + '.' + self.format
-        self.file_pic.name = self.name + '.png'
+        if self.file_pic:
+            self.file_pic.name = self.name + '.png'
         return super().save(*args, **kwargs)
 
     class Meta:
