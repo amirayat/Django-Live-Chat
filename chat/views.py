@@ -11,13 +11,13 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.permissions import IsAdminUser as IsStaff
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, ListModelMixin
-from chat.models import ChatRoom, ChatMember, FileUpload
+from chat.models import ChatRoom, ChatMember, FileUpload, PredefinedMessage
 from chat.serializers import (ChatRoomSerializer,
                               ListGroupSerializer,
                               ListPrivateChatSerializer,
                               ListTicketSerializer,
                               GroupSingleMemberSerializer,
-                              CreateGroupSerializer,
+                              CreateGroupSerializer, PredefinedMessageSerializer,
                               PrivateChatSerializer,
                               TicketSerializer,
                               AssignStaffToTicketSerializer,
@@ -542,6 +542,9 @@ class MemberActionPermissionAPIView(RetrieveUpdateAPIView):
         return Response({"status": "Done"})
 
 
+###
+# FILE UPLOAD
+###
 class FileUploadView(CreateModelMixin,
                      RetrieveModelMixin,
                      DestroyModelMixin,
@@ -555,3 +558,19 @@ class FileUploadView(CreateModelMixin,
 
     def get_queryset(self):
         return super().get_queryset().filter(user=self.request.user)
+
+
+###
+# FILE UPLOAD
+###
+class PredefinedMessageViewSet(ModelViewSet):
+    """
+    viewset for predefined messages 
+    """
+    permission_classes = [IsStaff]
+    serializer_class = PredefinedMessageSerializer
+    queryset = PredefinedMessage.objects.all()
+
+    @method_decorator(cache_page(60*60*168))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
