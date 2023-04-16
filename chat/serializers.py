@@ -1,8 +1,15 @@
 from django.conf import settings
 from rest_framework import serializers
-from chat.models import ChatRoom, ChatMember, FileUpload, UserModel
+from django.contrib.auth import get_user_model
 from chat.permissions import permission_coefficients
 from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, generate_file_pic
+from chat.models import (ChatRoom,
+                         ChatMember,
+                         FileUpload,
+                         PredefinedMessage)
+
+
+UserModel = get_user_model()
 
 
 class UserMemberSerializer(serializers.ModelSerializer):
@@ -60,7 +67,8 @@ class ChatRoomMultiMemberSerializer(serializers.ModelSerializer):
 
     def validate_members(self, value):
         if len(self.initial_data['members']) == 0:
-            raise serializers.ValidationError("At least one member is required.")
+            raise serializers.ValidationError(
+                "At least one member is required.")
         return value
 
     class Meta:
@@ -353,7 +361,7 @@ class AdminSerializer(serializers.ModelSerializer):
     """
     permission = AdminActionPermissionSerializer(source='member')
 
-    def validate_permission(self,value):
+    def validate_permission(self, value):
         permission_serializer = AdminActionPermissionSerializer(
             data=self.initial_data['permission'])
         permission_serializer.is_valid(raise_exception=True)
@@ -372,7 +380,7 @@ class MemberSerializer(serializers.ModelSerializer):
     """
     permission = MemberActionPermissionSerializer(source='member')
 
-    def validate_permission(self,value):
+    def validate_permission(self, value):
         permission_serializer = MemberActionPermissionSerializer(
             data=self.initial_data['permission'])
         permission_serializer.is_valid(raise_exception=True)
@@ -397,7 +405,8 @@ class UploadSerializer(serializers.ModelSerializer):
         _file = attrs.get("file")
         _size = _file.size
         if _size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
-            raise serializers.ValidationError({'file':'File size exceeds the limite.'})
+            raise serializers.ValidationError(
+                {'file': 'File size exceeds the limite.'})
         return super().validate(attrs)
 
     def create(self, validated_data):
@@ -418,4 +427,29 @@ class UploadSerializer(serializers.ModelSerializer):
             "file_pic",
             "file_type",
             "user"
+        ]
+
+
+class PredefinedMessageSerializer(serializers.ModelSerializer):
+    """
+    serializer class for predefined messages
+    """
+
+    def validate(self, attrs):
+        text = attrs.get("text")
+        file = attrs.get("file")
+        if isinstance(text, str) and text.replace(" ","") in ['""', "''"]:
+            raise serializers.ValidationError({'text': 'Empty text is not allowed.'})
+        if text == file == None:
+            raise serializers.ValidationError('Message with no content is not valid.')
+        return super().validate(attrs)
+
+    class Meta:
+        model = PredefinedMessage
+        read_only_fields = [
+            "id",
+        ]
+        fields = read_only_fields + [
+            "text",
+            "file"
         ]
