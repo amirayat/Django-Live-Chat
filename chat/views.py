@@ -2,6 +2,8 @@ from functools import lru_cache
 from django.http import Http404
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
 from rest_framework import status, exceptions
 from rest_framework.response import Response
 from rest_framework.generics import RetrieveUpdateAPIView, UpdateAPIView, ListAPIView
@@ -286,6 +288,10 @@ class TopPublicGroupViewSet(ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ListGroupSerializer
     queryset = ChatRoom.objects.top_public_groups()
+
+    @method_decorator(cache_page(60*60*2))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 
 class GroupViewSet(CreateModelMixin,
