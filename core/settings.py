@@ -20,6 +20,12 @@ from django.utils.translation import gettext_lazy as _
 
 load_dotenv()
 
+REDIS_HOST=os.getenv('REDIS_HOST')
+REDIS_PORT=os.getenv('REDIS_PORT')
+REDIS_DB=os.getenv('REDIS_DB')
+REDIS_USER=os.getenv('REDIS_USER')
+REDIS_PASSWORD=os.getenv('REDIS_PASSWORD')
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -51,7 +57,7 @@ INSTALLED_APPS = [
     # third-party apps
     'corsheaders',
     'minio_storage',
-    'channels',
+    # 'channels',
     'django_eventstream',
     'rest_framework',
     'djoser',
@@ -310,3 +316,11 @@ MINIO_STORAGE_MEDIA_URL = os.getenv('MINIO_STORAGE_MEDIA_URL')
 MINIO_STORAGE_STATIC_URL = os.getenv('MINIO_STORAGE_STATIC_URL')
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('FILE_UPLOAD_MAX_MEMORY_SIZE'))*2**20
+
+# https://docs.djangoproject.com/en/4.2/topics/cache/#redis
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{REDIS_USER}:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}",
+    }
+}
