@@ -20,11 +20,11 @@ from django.utils.translation import gettext_lazy as _
 
 load_dotenv()
 
-REDIS_HOST=os.getenv('REDIS_HOST')
-REDIS_PORT=os.getenv('REDIS_PORT')
-REDIS_DB=os.getenv('REDIS_DB')
-REDIS_USER=os.getenv('REDIS_USER')
-REDIS_PASSWORD=os.getenv('REDIS_PASSWORD')
+REDIS_HOST = os.getenv('REDIS_HOST')
+REDIS_PORT = os.getenv('REDIS_PORT')
+REDIS_DB = os.getenv('REDIS_DB')
+REDIS_USER = os.getenv('REDIS_USER')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -81,8 +81,17 @@ MIDDLEWARE = [
 ]
 
 if DEBUG:
-    INSTALLED_APPS.append("query_counter")
-    MIDDLEWARE.append("query_counter.middleware.DjangoQueryCounterMiddleware")
+    INSTALLED_APPS.extend([
+        "query_counter",
+        "debug_toolbar"
+    ])
+    MIDDLEWARE.extend([
+        "debug_toolbar.middleware.DebugToolbarMiddleware",
+        "query_counter.middleware.DjangoQueryCounterMiddleware",
+    ])
+
+# https://django-debug-toolbar.readthedocs.io/en/latest/installation.html#configure-internal-ips
+INTERNAL_IPS = ["127.0.0.1"]
 
 ROOT_URLCONF = 'core.urls'
 
@@ -112,7 +121,7 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
             "hosts": [(
-                os.getenv('REDIS_HOST'), 
+                os.getenv('REDIS_HOST'),
                 int(os.getenv('REDIS_PORT'))
             )],
         },
@@ -307,15 +316,18 @@ STATICFILES_STORAGE = 'minio_storage.storage.MinioStaticStorage'
 MINIO_STORAGE_ENDPOINT = os.getenv('MINIO_STORAGE_ENDPOINT')
 MINIO_STORAGE_ACCESS_KEY = os.getenv('MINIO_STORAGE_ACCESS_KEY')
 MINIO_STORAGE_SECRET_KEY = os.getenv('MINIO_STORAGE_SECRET_KEY')
-MINIO_STORAGE_USE_HTTPS = ast.literal_eval(os.getenv('MINIO_STORAGE_USE_HTTPS'))
+MINIO_STORAGE_USE_HTTPS = ast.literal_eval(
+    os.getenv('MINIO_STORAGE_USE_HTTPS'))
 MINIO_STORAGE_MEDIA_BUCKET_NAME = os.getenv('MINIO_STORAGE_MEDIA_BUCKET_NAME')
 MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
-MINIO_STORAGE_STATIC_BUCKET_NAME = os.getenv('MINIO_STORAGE_STATIC_BUCKET_NAME')
+MINIO_STORAGE_STATIC_BUCKET_NAME = os.getenv(
+    'MINIO_STORAGE_STATIC_BUCKET_NAME')
 MINIO_STORAGE_AUTO_CREATE_STATIC_BUCKET = True
 MINIO_STORAGE_MEDIA_URL = os.getenv('MINIO_STORAGE_MEDIA_URL')
 MINIO_STORAGE_STATIC_URL = os.getenv('MINIO_STORAGE_STATIC_URL')
 
-FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('FILE_UPLOAD_MAX_MEMORY_SIZE'))*2**20
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.getenv('FILE_UPLOAD_MAX_MEMORY_SIZE'))*2**20
 
 # https://docs.djangoproject.com/en/4.2/topics/cache/#redis
 CACHES = {
