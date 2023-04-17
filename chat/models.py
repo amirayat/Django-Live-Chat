@@ -462,14 +462,12 @@ class ChatRoom(RootModel):
         """
         return self.chat_room_message.select_related('file','reply_to').order_by('-created_at')
 
-    def count_until_last_seen(self, user: UserModel) -> dict:
+    def count_until_last_seen(self, user: UserModel) -> int:
         """
         count user seen messages to find offset for message list
         """
-        last_seen_created_at = self.chat_messages() \
-            .filter(Q(seen=False) & ~Q(sender=user)).first().created_at
         return self.chat_messages() \
-            .filter(created_at__lte=Subquery(last_seen_created_at)).count()
+            .filter(Q(seen=False) & ~Q(sender=user)).count()
 
     def save(self, *args, **kwargs) -> None:
         if self.closed_at and (self.is_ticket or self.is_group):
