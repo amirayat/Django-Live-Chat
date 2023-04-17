@@ -66,5 +66,7 @@ urlpatterns = [
 
     path('report/', include(report_router.urls)),
 
+    path('upload/', include(upload_router.urls)),
+
     path('<int:chat_room_id>/messages/', MessageAPIView.as_view()),
 ]
