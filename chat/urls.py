@@ -17,7 +17,7 @@ from chat.views import (AddMemberToGroupAPIView,
                         CloseLockTicketAPIView,
                         AssignStaffToTicketAPIView,
                         UnBlockUserAPIView,
-                        MemberActionPermissionAPIView)
+                        MemberActionPermissionAPIView, UserChatRoomsAPIView)
 
 
 ticket_router = routers.DefaultRouter()
@@ -59,6 +59,8 @@ urlpatterns = [
     path('group/<int:id>/demote/', DemoteAdminAPIView.as_view()),
     path('group/<int:chat_room_id>/leave/', LeaveGroupAPIView.as_view()),
     path('group/', include(group_router.urls)),
+    
+    path('chat_rooms/', UserChatRoomsAPIView.as_view()),
 
     path('group/<int:id>/permission/<int:user_id>/', MemberActionPermissionAPIView.as_view()),
 
