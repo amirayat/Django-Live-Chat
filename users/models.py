@@ -1,6 +1,8 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import AbstractUser
 from chat.permissions import permission, no_permission
+from users.validator import UnicodeUsernameValidator
 
 
 class ChatUser(AbstractUser):
@@ -8,12 +10,26 @@ class ChatUser(AbstractUser):
     model class for users
     """
 
+    username_validator = UnicodeUsernameValidator()
+
     def __init__(self, *args, **kwargs) -> None:
         self._role = None
         self._action_permission = no_permission()
         super().__init__(*args, **kwargs)
 
     photo = models.ImageField(upload_to='user_picture', null=True)
+    username = models.CharField(
+        _("username"),
+        max_length=150,
+        unique=True,
+        help_text=_(
+            "Required. 150 characters or fewer. Letters, digits only."
+        ),
+        validators=[username_validator],
+        error_messages={
+            "unique": _("A user with that username already exists."),
+        },
+    )
 
     @property
     def role(self):
