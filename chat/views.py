@@ -1,6 +1,7 @@
 from functools import lru_cache
 from django.conf import settings
 from django.http import Http404
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import cache_page
@@ -40,9 +41,9 @@ from chat.permissions import (IsAdmin_CanAdd,
 UserModel = get_user_model()
 
 
-###
+###•••••••••••••••••••••••••••
 # BASE CLASSES FOR OTHER VIEWS
-###
+###•••••••••••••••••••••••••••
 class AddNewMemberAPIView(UpdateAPIView):
     """
     add new member to chat room
@@ -120,9 +121,9 @@ class MemberManagementAPIView(UpdateAPIView):
         return Response({"status": "Done"})
 
 
-###
+###•••••••••••
 # USER_TICKET
-###
+###•••••••••••
 class TicketViewSet(ModelViewSet):
     """
     viewset for ticket 
@@ -202,9 +203,9 @@ class AssignStaffToTicketAPIView(AddNewMemberAPIView):
     is_staff_filter = True
 
 
-###
+###•••••••••••
 # PRIVATE_CHAT
-###
+###•••••••••••
 class PrivateChatViewSet(CreateModelMixin,
                          RetrieveModelMixin,
                          ListModelMixin,
@@ -281,9 +282,9 @@ class UnBlockUserAPIView(UpdateAPIView):
         return Response({"status": "Done"})
 
 
-###
+###•••••••••••
 # GROUPE
-###
+###•••••••••••
 class TopPublicGroupViewSet(ListAPIView):
     """
     list of top public groups
@@ -545,9 +546,9 @@ class MemberActionPermissionAPIView(RetrieveUpdateAPIView):
         return Response({"status": "Done"})
 
 
-###
+###•••••••••••
 # FILE UPLOAD
-###
+###•••••••••••
 class FileUploadView(CreateModelMixin,
                      RetrieveModelMixin,
                      DestroyModelMixin,
@@ -563,9 +564,9 @@ class FileUploadView(CreateModelMixin,
         return super().get_queryset().filter(user=self.request.user)
 
 
-###
+###•••••••••••
 # Predefined Message
-###
+###•••••••••••
 class PredefinedMessageViewSet(ModelViewSet):
     """
     viewset for predefined messages 
@@ -579,9 +580,9 @@ class PredefinedMessageViewSet(ModelViewSet):
         return super().list(request, *args, **kwargs)
 
 
-###
+###•••••••••••
 # Report
-###
+###•••••••••••
 class ReportViewSet(ModelViewSet):
     """
     viewset for reports
@@ -607,9 +608,9 @@ class ReportViewSet(ModelViewSet):
         return super().list(request, *args, **kwargs)
 
 
-###
+###•••••••••••
 # Message
-###
+###•••••••••••
 class LastSeenOffsetAPIView(RetrieveAPIView):
     """
     to find last seen massage offset for MessageView
@@ -645,11 +646,15 @@ class MessageAPIView(ListAPIView):
             raise Http404
         self.check_object_permissions(self.request, chat_room)
         queryset = chat_room.chat_messages()
-
         page = self.paginate_queryset(queryset)
+        # seen messages in the page by request user
+        Message.objects.filter(id__in=[obj.id for obj in page]).seen(request.user)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            resp = serializer.data
+            for obj in resp:
+                obj['seen'] = True
+            return self.get_paginated_response(resp)
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
