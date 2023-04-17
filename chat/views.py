@@ -638,6 +638,7 @@ class MessageAPIView(ListAPIView):
     serializer_class = MessageSerializer
     queryset = Message.objects.all()
     lookup_field = 'chat_room_id'
+    swagger_schema = None
 
     def list(self, request, *args, **kwargs):
         try:
