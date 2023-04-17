@@ -483,7 +483,7 @@ class MessageSerializer(serializers.ModelSerializer):
     serializer for message 
     """
 
-    sender = UserMemberSerializer(read_only=True)
+    # sender = UserMemberSerializer(read_only=True)
     file = UploadSerializer(read_only=True, allow_null=True)
     
     def validate(self, attrs):
