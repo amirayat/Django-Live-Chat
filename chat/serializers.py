@@ -61,6 +61,22 @@ class ChatRoomSingleMemberSerializer(serializers.ModelSerializer):
         fields = read_only_fields + ["member"]
 
 
+class AddNewMemberToChatRoomSerializer(ChatRoomSingleMemberSerializer):
+    """
+    serializer for staff to assign new staff
+    """
+
+    class Meta:
+        model = ChatRoom
+        read_only_fields = [
+            "id",
+            "name",
+            "read_only",
+            "count_members",
+        ]
+        fields = read_only_fields + ["member"]
+
+
 class ChatRoomMultiMemberSerializer(serializers.ModelSerializer):
     """
     serilizer to add multiple members to a chat room
@@ -126,25 +142,6 @@ class TicketSerializer(ChatRoomSerializer):
         fields = read_only_fields + ["name", "priority"]
 
 
-class AssignStaffToTicketSerializer(ChatRoomSingleMemberSerializer):
-    """
-    serializer for staff to assign new staff
-    """
-
-    class Meta:
-        model = ChatRoom
-        read_only_fields = [
-            "id",
-            "name",
-            "closed",
-            "closed_at",
-            "priority",
-            "read_only",
-            "count_members",
-        ]
-        fields = read_only_fields + ["member"]
-
-
 ###
 # PRIVATE_CHAT
 ###
@@ -158,13 +155,12 @@ class ListPrivateChatSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "name",
-            "closed",
             "read_only",
         ]
         fields = read_only_fields
 
 
-class PrivateChatSerializer(ChatRoomSingleMemberSerializer):
+class PrivateChatSerializer(ChatRoomMultiMemberSerializer):
     """
     serializer for private chats
     receive members
@@ -175,11 +171,10 @@ class PrivateChatSerializer(ChatRoomSingleMemberSerializer):
         read_only_fields = [
             "id",
             "name",
-            "closed",
             "read_only",
             "count_members",
         ]
-        fields = read_only_fields + ["member"]
+        fields = read_only_fields + ["members"]
 
 
 ###
