@@ -1,4 +1,5 @@
 from functools import lru_cache
+from django.conf import settings
 from django.http import Http404
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -616,12 +617,14 @@ class LastSeenOffsetAPIView(RetrieveAPIView):
     permission_classes = [IsMember]
     serializer_class = None
     queryset = Message.objects.all()
-    lookup_field = 'id'
+    lookup_field = 'chat_room_id'
 
-    def get_object(self):
+    def retrieve(self, request, *args, **kwargs):
+        limit = int(request.GET.get('limit', settings.REST_FRAMEWORK.get('PAGE_SIZE', '5')))
         try:
-            return ChatRoom.objects.get(id=self.kwargs[self.lookup_field]) \
-                .count_until_last_seen()
+            count_until_last_seen = ChatRoom.objects.get(id=self.kwargs[self.lookup_field]) \
+                .count_until_last_seen(request.user)
+            return Response({'limit':limit, 'offset':count_until_last_seen//limit*limit})
         except:
             raise Http404
 
