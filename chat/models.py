@@ -4,7 +4,7 @@ from typing import TypeVar
 from functools import lru_cache
 from django.db import models
 from django.utils import timezone
-from django.db.models import Count, Q, F
+from django.db.models import QuerySet, Subquery, Count, Q, F
 from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from core.base_model import RootModel, RootModelManager
@@ -70,7 +70,7 @@ class ChatRoomManager(RootModelManager):
         creator: request.user
         contact: another user 
         """
-        _name = str(creator.id)+'.'+str(contact.id)+'.'+contact.username
+        _name = str(creator.id)+'.'+creator.username+'_'+str(contact.id)+'.'+contact.username
         _private_chat, _is_create = ChatRoom.objects.get_or_create(
             name=_name,
             type="PRIVATE_CHAT"
@@ -456,6 +456,21 @@ class ChatRoom(RootModel):
             return True
         return False
 
+    def chat_messages(self) -> QuerySet:
+        """
+        return queryset of chat room messages
+        """
+        return self.chat_room_message.select_related('file','sender','reply_to').order_by('-created_at')
+
+    def count_until_last_seen(self, user: UserModel) -> dict:
+        """
+        count user seen messages to find offset for message list
+        """
+        last_seen_created_at = self.chat_messages() \
+            .filter(Q(seen=False) & ~Q(sender=user)).first().created_at
+        return self.chat_messages() \
+            .filter(created_at__lte=Subquery(last_seen_created_at)).count()
+
     def save(self, *args, **kwargs) -> None:
         if self.closed_at and (self.is_ticket or self.is_group):
             """
@@ -615,3 +630,61 @@ class Report(RootModel):
             models.UniqueConstraint(
                 fields=['reporter', 'group'], name='unique_reporter_group')
         ]
+
+
+class MessageManager(RootModelManager):
+    """
+    custom manager for message
+    """
+
+    def update(self, **kwargs) -> int:
+        """
+        save seen time
+        """
+        if kwargs.get('seen', False):
+            return super().filter(seen_at__isnull=True).update(**kwargs, seen_at=timezone.now())
+        return super().update(**kwargs)
+
+
+class Message(RootModel):
+    """
+    chat message
+    """
+    message_type = (
+        ("TEXT", "TEXT"),
+        ("FILE", "FILE"),
+        ("ONLINE", "ONLINE"),
+        ("NOTICE", "NOTICE"),
+        ("TYPING", "TYPING"),
+        ("SENDING", "SENDING"),
+    ) 
+    type = models.CharField(max_length=7, choices=message_type)
+    text = models.TextField(null=True)
+    seen = models.BooleanField(default=False)
+    seen_at = models.DateTimeField(null=True)
+    file = models.OneToOneField(FileUpload, related_name=_(
+        'message_file'), on_delete=models.CASCADE, null=True)
+    chat_room = models.ForeignKey(ChatRoom, related_name=_(
+        'chat_room_message'), on_delete=models.CASCADE)
+    sender = models.ForeignKey(UserModel, related_name=_(
+        'message_sender'), on_delete=models.CASCADE)
+    reply_to = models.ForeignKey('self', related_name=_(
+        'reply_to_message'), on_delete=models.SET_NULL, null=True)
+
+    objects = MessageManager()
+
+    def save(self, *args, **kwargs) -> None:
+        if self.seen_at:
+            """
+            save nothing if it has been seen before
+            """
+            return None
+        if self.seen:
+            """
+            record seen time
+            """
+            self.seen_at = timezone.now()
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = 'chat_messages'
