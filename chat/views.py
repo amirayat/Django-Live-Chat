@@ -20,7 +20,7 @@ from chat.serializers import (ChatRoomSerializer,
                               CreateGroupSerializer, MessageSerializer, PredefinedMessageSerializer,
                               PrivateChatSerializer, ReportSerializer,
                               TicketSerializer,
-                              AssignStaffToTicketSerializer,
+                              AddNewMemberToChatRoomSerializer,
                               UpdateGroupSerializer,
                               AdminSerializer,
                               MemberSerializer, UploadSerializer)
@@ -195,7 +195,7 @@ class AssignStaffToTicketAPIView(AddNewMemberAPIView):
     assign another staff to ticket by staff
     """
     permission_classes = [IsMember & IsStaff]
-    serializer_class = AssignStaffToTicketSerializer
+    serializer_class = AddNewMemberToChatRoomSerializer
     queryset = ChatRoom.objects.filter(type='USER_TICKET')
     closed_exception_message = "Ticket has been closed."
     is_staff_filter = True
@@ -218,6 +218,8 @@ class PrivateChatViewSet(CreateModelMixin,
     def get_serializer_class(self):
         if self.action == "list":
             self.serializer_class = ListPrivateChatSerializer
+        elif self.action == "create":
+            self.serializer_class = AddNewMemberToChatRoomSerializer
         else:
             self.serializer_class = PrivateChatSerializer
         return super().get_serializer_class()
@@ -243,7 +245,7 @@ class PrivateChatViewSet(CreateModelMixin,
             creator=request.user,
             contact=_contact)
         headers = self.get_success_headers(serializer.data)
-        return Response(self.get_serializer(private_chat).data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response({"status": "Done"})
 
 
 class BlockUserAPIView(UpdateAPIView):
