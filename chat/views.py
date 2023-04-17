@@ -6,18 +6,18 @@ from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from rest_framework import status, exceptions
 from rest_framework.response import Response
-from rest_framework.generics import RetrieveUpdateAPIView, UpdateAPIView, ListAPIView
+from rest_framework.generics import RetrieveUpdateAPIView, UpdateAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.permissions import IsAdminUser as IsStaff
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, ListModelMixin
-from chat.models import ChatRoom, ChatMember, FileUpload, PredefinedMessage, Report
+from chat.models import ChatRoom, ChatMember, FileUpload, PredefinedMessage, Report, Message
 from chat.serializers import (ChatRoomSerializer,
                               ListGroupSerializer,
                               ListPrivateChatSerializer,
                               ListTicketSerializer,
                               GroupSingleMemberSerializer,
-                              CreateGroupSerializer, PredefinedMessageSerializer,
+                              CreateGroupSerializer, MessageSerializer, PredefinedMessageSerializer,
                               PrivateChatSerializer, ReportSerializer,
                               TicketSerializer,
                               AssignStaffToTicketSerializer,
@@ -602,3 +602,44 @@ class ReportViewSet(ModelViewSet):
     @method_decorator(cache_page(60*60*2))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+
+###
+# Message
+###
+class LastSeenOffsetAPIView(RetrieveAPIView):
+    """
+    to find last seen massage offset for MessageView
+    """
+    permission_classes = [IsMember]
+    serializer_class = None
+    queryset = Message.objects.all()
+    lookup_field = 'id'
+
+    def get_object(self):
+        try:
+            return ChatRoom.objects.get(id=self.kwargs[self.lookup_field]) \
+                .count_until_last_seen()
+        except:
+            raise Http404
+
+
+class MessageAPIView(ListAPIView):
+    """
+    view class to list ticket messages
+    """
+    permission_classes = [IsMember]
+    serializer_class = MessageSerializer
+    queryset = Message.objects.all()
+    lookup_field = 'chat_room_id'
+
+    def get_object(self):
+        pass
+
+    def get_queryset(self):
+        chat_room = ChatRoom.objects.get(id=self.kwargs[self.lookup_field])
+        self.check_object_permissions(self.request, chat_room)
+        try:
+            return chat_room.chat_messages()
+        except:
+            raise Http404
