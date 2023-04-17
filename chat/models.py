@@ -460,7 +460,7 @@ class ChatRoom(RootModel):
         """
         return queryset of chat room messages
         """
-        return self.chat_room_message.select_related('file','sender','reply_to').order_by('-created_at')
+        return self.chat_room_message.select_related('file','reply_to').order_by('-created_at')
 
     def count_until_last_seen(self, user: UserModel) -> dict:
         """
