@@ -4,7 +4,7 @@ from typing import TypeVar
 from functools import lru_cache
 from django.db import models
 from django.utils import timezone
-from django.db.models import QuerySet, Subquery, Count, Q, F
+from django.db.models import QuerySet, Count, Q, F
 from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from core.base_model import RootModel, RootModelManager
@@ -70,7 +70,8 @@ class ChatRoomManager(RootModelManager):
         creator: request.user
         contact: another user 
         """
-        _name = str(creator.id)+'.'+creator.username+'_'+str(contact.id)+'.'+contact.username
+        _name = str(creator.id)+'.'+creator.username+'_' + \
+            str(contact.id)+'.'+contact.username
         _private_chat, _is_create = ChatRoom.objects.get_or_create(
             name=_name,
             type="PRIVATE_CHAT"
@@ -460,7 +461,7 @@ class ChatRoom(RootModel):
         """
         return queryset of chat room messages
         """
-        return self.chat_room_message.select_related('file','reply_to').order_by('-created_at')
+        return self.chat_room_message.select_related('file', 'reply_to').order_by('-created_at')
 
     def count_until_last_seen(self, user: UserModel) -> int:
         """
@@ -630,18 +631,23 @@ class Report(RootModel):
         ]
 
 
-class MessageManager(RootModelManager):
+class MessageQuerySet(models.query.QuerySet):
     """
-    custom manager for message
+    custom QuerySet for Message model
     """
 
-    def update(self, **kwargs) -> int:
-        """
-        save seen time
-        """
-        if kwargs.get('seen', False):
-            return super().filter(seen_at__isnull=True).update(**kwargs, seen_at=timezone.now())
-        return super().update(**kwargs)
+    def seen(self, user: UserModel) -> int:
+        return self.filter(seen_at__isnull=True) \
+            .exclude(sender=user).update(seen=True, seen_at=timezone.now())
+
+
+class MessageManager(models.manager.BaseManager.from_queryset(MessageQuerySet)):
+    """
+    custom manager for Message model
+    """
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
 
 
 class Message(RootModel):
@@ -655,7 +661,7 @@ class Message(RootModel):
         ("NOTICE", "NOTICE"),
         ("TYPING", "TYPING"),
         ("SENDING", "SENDING"),
-    ) 
+    )
     type = models.CharField(max_length=7, choices=message_type)
     text = models.TextField(null=True)
     seen = models.BooleanField(default=False)
