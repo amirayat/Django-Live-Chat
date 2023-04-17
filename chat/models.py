@@ -645,7 +645,7 @@ class MessageQuerySet(models.query.QuerySet):
             in case of TICKET, staff user doesn't mark other staff messages as seen 
             """
             return self.filter(seen_at__isnull=True) \
-                .exclude(sender=user, sender__is_staff=True).update(seen=True, seen_at=timezone.now())
+                .exclude(sender__is_staff=True).update(seen=True, seen_at=timezone.now())
         else:
             return self.filter(seen_at__isnull=True) \
                 .exclude(sender=user).update(seen=True, seen_at=timezone.now())
