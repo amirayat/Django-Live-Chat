@@ -637,8 +637,18 @@ class MessageQuerySet(models.query.QuerySet):
     """
 
     def seen(self, user: UserModel) -> int:
-        return self.filter(seen_at__isnull=True) \
-            .exclude(sender=user).update(seen=True, seen_at=timezone.now())
+        """
+        user: request.user
+        """
+        if user.is_staff:
+            """
+            in case of TICKET, staff user doesn't mark other staff messages as seen 
+            """
+            return self.filter(seen_at__isnull=True) \
+                .exclude(sender=user, sender__is_staff=True).update(seen=True, seen_at=timezone.now())
+        else:
+            return self.filter(seen_at__isnull=True) \
+                .exclude(sender=user).update(seen=True, seen_at=timezone.now())
 
 
 class MessageManager(models.manager.BaseManager.from_queryset(MessageQuerySet)):
