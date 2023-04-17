@@ -635,13 +635,18 @@ class MessageAPIView(ListAPIView):
     queryset = Message.objects.all()
     lookup_field = 'chat_room_id'
 
-    def get_object(self):
-        pass
-
-    def get_queryset(self):
-        chat_room = ChatRoom.objects.get(id=self.kwargs[self.lookup_field])
-        self.check_object_permissions(self.request, chat_room)
+    def list(self, request, *args, **kwargs):
         try:
-            return chat_room.chat_messages()
+            chat_room = ChatRoom.objects.get(id=self.kwargs[self.lookup_field])
         except:
             raise Http404
+        self.check_object_permissions(self.request, chat_room)
+        queryset = chat_room.chat_messages()
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
