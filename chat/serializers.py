@@ -96,10 +96,25 @@ class ChatRoomMultiMemberSerializer(serializers.ModelSerializer):
         fields = read_only_fields + ["members"]
 
 
-###
+class ListChatRoomsSerializer(serializers.ModelSerializer):
+    """
+    serializer for list chat rooms
+    """
+
+    class Meta:
+        model = ChatRoom
+        read_only_fields = [
+            "id",
+            "name",
+            "type",
+        ]
+        fields = read_only_fields
+
+
+###•••••••••••
 # USER_TICKET
-###
-class ListTicketSerializer(serializers.ModelSerializer):
+###•••••••••••
+class ListTicketSerializer(ListChatRoomsSerializer):
     """
     serializer for list tickets
     """
@@ -142,10 +157,10 @@ class TicketSerializer(ChatRoomSerializer):
         fields = read_only_fields + ["name", "priority"]
 
 
-###
+###•••••••••••
 # PRIVATE_CHAT
-###
-class ListPrivateChatSerializer(serializers.ModelSerializer):
+###•••••••••••
+class ListPrivateChatSerializer(ListChatRoomsSerializer):
     """
     serializer for list private chats
     """
@@ -177,10 +192,10 @@ class PrivateChatSerializer(ChatRoomMultiMemberSerializer):
         fields = read_only_fields + ["members"]
 
 
-###
+###•••••••••••
 # GROUPE
-###
-class ListGroupSerializer(serializers.ModelSerializer):
+###•••••••••••
+class ListGroupSerializer(ListChatRoomsSerializer):
     """
     serializer for list groups
     """
@@ -428,9 +443,9 @@ class UploadSerializer(serializers.ModelSerializer):
         ]
 
 
-###
+###••••••••••••••••••••••
 # Predefined Message
-###
+###••••••••••••••••••••••
 class PredefinedMessageSerializer(serializers.ModelSerializer):
     """
     serializer class for predefined messages
@@ -456,9 +471,9 @@ class PredefinedMessageSerializer(serializers.ModelSerializer):
         ]
 
 
-###
+###•••••••••••
 # Report
-###
+###•••••••••••
 class ReportSerializer(serializers.ModelSerializer):
     """
     serializer class for reports
@@ -475,9 +490,9 @@ class ReportSerializer(serializers.ModelSerializer):
         fields = read_only_fields
 
 
-###
+###•••••••••••
 # Message
-###
+###•••••••••••
 class MessageSerializer(serializers.ModelSerializer):
     """
     serializer for message 
