@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework import routers
 from chat.views import (AddMemberToGroupAPIView,
-                        BlockUserAPIView, FileUploadView, MessageAPIView, PredefinedMessageViewSet, ReportViewSet,
+                        BlockUserAPIView, FileUploadView, LastSeenOffsetAPIView, MessageAPIView, PredefinedMessageViewSet, ReportViewSet,
                         Un_LockGroupAPIView,
                         CloseGroupAPIView,
                         DemoteAdminAPIView,
@@ -69,4 +69,6 @@ urlpatterns = [
     path('upload/', include(upload_router.urls)),
 
     path('<int:chat_room_id>/messages/', MessageAPIView.as_view()),
+
+    path('<int:chat_room_id>/offset/', LastSeenOffsetAPIView.as_view()),
 ]
