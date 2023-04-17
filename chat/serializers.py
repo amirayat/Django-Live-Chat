@@ -1,12 +1,15 @@
 from django.conf import settings
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from rest_framework import serializers
+from profanity_filter import ProfanityFilter
 from chat.permissions import permission_coefficients
 from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, generate_file_pic
 from chat.models import (ChatRoom,
                          ChatMember,
                          FileUpload,
-                         PredefinedMessage, Report)
+                         PredefinedMessage, 
+                         Report,
+                         Message)
 
 
 UserModel = get_user_model()
@@ -475,3 +478,51 @@ class ReportSerializer(serializers.ModelSerializer):
             "group"
         ]
         fields = read_only_fields
+
+
+###
+# Message
+###
+class MessageSerializer(serializers.ModelSerializer):
+    """
+    serializer for message 
+    """
+
+    sender = UserMemberSerializer(read_only=True)
+    file = UploadSerializer(read_only=True, allow_null=True)
+    
+    def validate(self, attrs):
+        type = attrs.get("type")
+        text = attrs.get("text", None)
+        file = attrs.get("file", None)
+        pf = ProfanityFilter()
+        if (type == "TEXT" and text is None) or (type == "FILE" and file is None):
+            raise serializers.ValidationError({"error":"Message with no content is not valid."})
+        if text and not pf.is_clean(text):
+            raise serializers.ValidationError({"error":"Message contains swear word."})
+        return super().validate(attrs)
+
+    def get_fields(self):
+        """
+        put a recursive serializer on reply_to
+        """
+        fields = super().get_fields()
+        fields['reply_to'] = MessageSerializer()
+        return fields
+
+    class Meta:
+        model = Message
+        read_only_fields = [
+            "id",
+            "seen",
+            "seen_at",
+            "chat_room",
+            "sender",
+            "created_at"
+        ]
+        fields = read_only_fields + [
+            "type",
+            "text",
+            "file",
+            "reply_to",
+        ]
