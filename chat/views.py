@@ -648,12 +648,13 @@ class MessageAPIView(ListAPIView):
         queryset = chat_room.chat_messages()
         page = self.paginate_queryset(queryset)
         # seen messages in the page by request user
-        Message.objects.filter(id__in=[obj.id for obj in page]).seen(request.user)
+        seen = Message.objects.filter(id__in=[obj.id for obj in page]).seen(request.user)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             resp = serializer.data
-            for obj in resp:
-                obj['seen'] = True
+            if seen:
+                for obj in resp:
+                    obj['seen'] = True
             return self.get_paginated_response(resp)
 
         serializer = self.get_serializer(queryset, many=True)
