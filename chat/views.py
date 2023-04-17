@@ -19,13 +19,18 @@ from chat.serializers import (ChatRoomSerializer,
                               ListPrivateChatSerializer,
                               ListTicketSerializer,
                               GroupSingleMemberSerializer,
-                              CreateGroupSerializer, MessageSerializer, PredefinedMessageSerializer,
-                              PrivateChatSerializer, ReportSerializer,
+                              CreateGroupSerializer, 
+                              MessageSerializer, 
+                              PredefinedMessageSerializer,
+                              PrivateChatSerializer, 
+                              ReportSerializer,
                               TicketSerializer,
                               AddNewMemberToChatRoomSerializer,
                               UpdateGroupSerializer,
                               AdminSerializer,
-                              MemberSerializer, UploadSerializer)
+                              MemberSerializer, 
+                              UploadSerializer,
+                              ListChatRoomsSerializer)
 from chat.permissions import (IsAdmin_CanAdd,
                               IsAdmin_CanClose,
                               IsAdmin_CanLock,
@@ -119,6 +124,18 @@ class MemberManagementAPIView(UpdateAPIView):
         if not result:
             raise exceptions.NotAcceptable({"members": self.not_found_message})
         return Response({"status": "Done"})
+
+
+class UserChatRoomsAPIView(ListAPIView):
+    """
+    user list of chat rooms
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = ListChatRoomsSerializer
+    queryset = ChatRoom.objects.all()
+
+    def get_queryset(self):
+        return super().get_queryset().filter(chat_member__user=self.request.user)
 
 
 ###•••••••••••
