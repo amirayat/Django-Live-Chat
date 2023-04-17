@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework import routers
 from chat.views import (AddMemberToGroupAPIView,
-                        BlockUserAPIView, FileUploadView, PredefinedMessageViewSet, ReportViewSet,
+                        BlockUserAPIView, FileUploadView, MessageAPIView, PredefinedMessageViewSet, ReportViewSet,
                         Un_LockGroupAPIView,
                         CloseGroupAPIView,
                         DemoteAdminAPIView,
@@ -23,8 +23,8 @@ from chat.views import (AddMemberToGroupAPIView,
 ticket_router = routers.DefaultRouter()
 ticket_router.register(r'', TicketViewSet)
 
-provate_chat_router = routers.DefaultRouter()
-provate_chat_router.register(r'', PrivateChatViewSet)
+private_chat_router = routers.DefaultRouter()
+private_chat_router.register(r'', PrivateChatViewSet)
 
 group_router = routers.DefaultRouter()
 group_router.register(r'', GroupViewSet)
@@ -46,7 +46,7 @@ urlpatterns = [
 
     path('private_chat/<int:id>/block/', BlockUserAPIView.as_view()),
     path('private_chat/<int:id>/unblock/', UnBlockUserAPIView.as_view()),
-    path('private_chat/', include(provate_chat_router.urls)),
+    path('private_chat/', include(private_chat_router.urls)),
 
     path('group/top/', TopPublicGroupViewSet.as_view()),
     path('group/<int:id>/update/', GroupUpdateAPIView.as_view()),
@@ -65,4 +65,6 @@ urlpatterns = [
     path('predefined_message/', include(predefined_messages_router.urls)),
 
     path('report/', include(report_router.urls)),
+
+    path('<int:chat_room_id>/messages/', MessageAPIView.as_view()),
 ]
