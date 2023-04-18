@@ -1,3 +1,4 @@
+from rest_framework.reverse import reverse
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
@@ -7,7 +8,7 @@ from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, generate_file_pic
 from chat.models import (ChatRoom,
                          ChatMember,
                          FileUpload,
-                         PredefinedMessage, 
+                         PredefinedMessage,
                          Report,
                          Message)
 
@@ -111,9 +112,9 @@ class ListChatRoomsSerializer(serializers.ModelSerializer):
         fields = read_only_fields
 
 
-###•••••••••••
+# •••••••••••
 # USER_TICKET
-###•••••••••••
+# •••••••••••
 class ListTicketSerializer(ListChatRoomsSerializer):
     """
     serializer for list tickets
@@ -157,9 +158,9 @@ class TicketSerializer(ChatRoomSerializer):
         fields = read_only_fields + ["name", "priority"]
 
 
-###•••••••••••
+# •••••••••••
 # PRIVATE_CHAT
-###•••••••••••
+# •••••••••••
 class ListPrivateChatSerializer(ListChatRoomsSerializer):
     """
     serializer for list private chats
@@ -192,9 +193,9 @@ class PrivateChatSerializer(ChatRoomMultiMemberSerializer):
         fields = read_only_fields + ["members"]
 
 
-###•••••••••••
+# •••••••••••
 # GROUPE
-###•••••••••••
+# •••••••••••
 class ListGroupSerializer(ListChatRoomsSerializer):
     """
     serializer for list groups
@@ -443,9 +444,9 @@ class UploadSerializer(serializers.ModelSerializer):
         ]
 
 
-###••••••••••••••••••••••
+# ••••••••••••••••••••••
 # Predefined Message
-###••••••••••••••••••••••
+# ••••••••••••••••••••••
 class PredefinedMessageSerializer(serializers.ModelSerializer):
     """
     serializer class for predefined messages
@@ -454,10 +455,12 @@ class PredefinedMessageSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         text = attrs.get("text")
         file = attrs.get("file")
-        if isinstance(text, str) and text.replace(" ","") in ['""', "''"]:
-            raise serializers.ValidationError({'text': 'Empty text is not allowed.'})
+        if isinstance(text, str) and text.replace(" ", "") in ['""', "''"]:
+            raise serializers.ValidationError(
+                {'text': 'Empty text is not allowed.'})
         if text == file == None:
-            raise serializers.ValidationError('Message with no content is not valid.')
+            raise serializers.ValidationError(
+                'Message with no content is not valid.')
         return super().validate(attrs)
 
     class Meta:
@@ -471,9 +474,9 @@ class PredefinedMessageSerializer(serializers.ModelSerializer):
         ]
 
 
-###•••••••••••
+# •••••••••••
 # Report
-###•••••••••••
+# •••••••••••
 class ReportSerializer(serializers.ModelSerializer):
     """
     serializer class for reports
@@ -490,35 +493,57 @@ class ReportSerializer(serializers.ModelSerializer):
         fields = read_only_fields
 
 
-###•••••••••••
+# •••••••••••
 # Message
-###•••••••••••
+# •••••••••••
+class ReplyToMessageSerializer(serializers.ModelSerializer):
+    """
+    serializer for reply to message 
+    """
+
+    url = serializers.SerializerMethodField()
+    file = UploadSerializer(read_only=True, allow_null=True)
+
+    def get_url(self, object):
+        return reverse(viewname="message-list",
+                       kwargs={"chat_room_id": object.chat_room_id},
+                       request=self.context['request']) + \
+            "?id_gte=" + str(object.id)
+
+    class Meta:
+        model = Message
+        read_only_fields = [
+            "url",
+            "sender",
+            "created_at",
+        ]
+        fields = read_only_fields + [
+            "type",
+            "text",
+            "file",
+        ]
+
+
 class MessageSerializer(serializers.ModelSerializer):
     """
     serializer for message 
     """
 
-    # sender = UserMemberSerializer(read_only=True)
+    reply_to = ReplyToMessageSerializer(read_only=True)
     file = UploadSerializer(read_only=True, allow_null=True)
-    
+
     def validate(self, attrs):
         type = attrs.get("type")
         text = attrs.get("text", None)
         file = attrs.get("file", None)
         pf = ProfanityFilter()
         if (type == "TEXT" and text is None) or (type == "FILE" and file is None):
-            raise serializers.ValidationError({"error":"Message with no content is not valid."})
+            raise serializers.ValidationError(
+                {"error": "Message with no content is not valid."})
         if text and not pf.is_clean(text):
-            raise serializers.ValidationError({"error":"Message contains swear word."})
+            raise serializers.ValidationError(
+                {"error": "Message contains swear word."})
         return super().validate(attrs)
-
-    def get_fields(self):
-        """
-        put a recursive serializer on reply_to
-        """
-        fields = super().get_fields()
-        fields['reply_to'] = MessageSerializer()
-        return fields
 
     class Meta:
         model = Message
