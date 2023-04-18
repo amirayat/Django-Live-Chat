@@ -70,7 +70,7 @@ urlpatterns = [
 
     path('upload/', include(upload_router.urls)),
 
-    path('<int:chat_room_id>/messages/', MessageAPIView.as_view()),
+    path('<int:chat_room_id>/messages/', MessageAPIView.as_view(), name="message-list"),
 
     path('<int:chat_room_id>/offset/', LastSeenOffsetAPIView.as_view()),
 ]
