@@ -4,9 +4,12 @@ from typing import TypeVar
 from functools import lru_cache
 from django.db import models
 from django.utils import timezone
+from django.dispatch import receiver
+from django.db.models.signals import post_save
 from django.db.models import QuerySet, Subquery, Count, Q, F
 from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
+from django_eventstream import send_event
 from core.base_model import RootModel, RootModelManager
 from chat.permissions import (permission,
                               creator_permissions,
@@ -14,6 +17,7 @@ from chat.permissions import (permission,
                               member_permissions,
                               no_permission)
 from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, AUDIO_FORMATS
+from chat.services import user_unread_messages
 
 
 UserModel = get_user_model()
@@ -692,9 +696,10 @@ class Message(RootModel):
     objects = MessageManager()
 
     def save(self, *args, **kwargs) -> None:
-        if self.seen_at:
+        if self.seen_at or self.type not in ["TEXT", "FILE"]:
             """
             save nothing if it has been seen before
+            don't save message unless of type TEXT or FILE 
             """
             return None
         if self.seen:
@@ -706,3 +711,48 @@ class Message(RootModel):
 
     class Meta:
         db_table = 'chat_messages'
+
+
+def user_unread_messages(user: UserModel) -> dict:
+    """
+    send not-seen-messeges event for a user id
+    return data format:
+    [
+        {
+            "chat_room": <int>,
+            "text": <str, null>,
+            "type": <str, null> ["IMAGE","VIDEO","AUDIO","FILE"],
+            "created_at": <str> datetime,
+            "unread_messages": <int>
+        },
+        ...
+    ]
+    """
+    # user chat rooms last message
+    last_messages = Message.objects.filter(chat_room__chat_member__user=user) \
+        .order_by('chat_room', '-created_at') \
+        .distinct('chat_room').values('chat_room', 'text', 'type', 'created_at')
+    # user chat rooms not seen messages count
+    not_seen_messages = Message.objects.filter(~Q(sender=user) & Q(seen=False)).values('chat_room') \
+        .annotate(unread_messages=Count('seen'))
+    # concat last_messages and not_seen_messages based on chat_room
+    for obj in last_messages:
+        obj['unread_messages'] = 0
+        for msg in not_seen_messages:
+            if obj['chat_room'] == msg['chat_room']:
+                obj['unread_messages'] = msg['unread_messages']
+    return list(last_messages)
+
+
+@receiver(post_save, sender=Message)
+def sse_signal(sender, instance, **kwargs):
+    """
+    unread message event to chat room members on new message
+    send if seen == False (no one in the chat room except sender)
+    """
+    if not instance.seen:
+        members = instance.chat_room.all_members
+        for user in members:
+            if user:
+                send_event('unread_messages_{}'.format(user.id),
+                        'message', user_unread_messages(user))
