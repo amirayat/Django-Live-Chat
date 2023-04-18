@@ -4,7 +4,7 @@ from typing import TypeVar
 from functools import lru_cache
 from django.db import models
 from django.utils import timezone
-from django.db.models import QuerySet, Count, Q, F
+from django.db.models import QuerySet, Subquery, Count, Q, F
 from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from core.base_model import RootModel, RootModelManager
@@ -461,14 +461,18 @@ class ChatRoom(RootModel):
         """
         return queryset of chat room messages
         """
-        return self.chat_room_message.select_related('file', 'reply_to').order_by('-created_at')
+        return self.chat_room_message.select_related('file', 'reply_to').order_by('created_at')
 
     def count_until_last_seen(self, user: UserModel) -> int:
         """
         count user seen messages to find offset for message list
         """
-        return self.chat_messages() \
-            .filter(Q(seen=False) & ~Q(sender=user)).count()
+        first_not_seen = self.chat_messages().filter(Q(seen=False) & ~Q(sender=user))[:1]
+        count = self.chat_messages() \
+            .filter(created_at__lt=Subquery(first_not_seen.values('created_at'))).count()
+        if count == 0:
+            count = self.chat_messages().count() - 1
+        return count
 
     def save(self, *args, **kwargs) -> None:
         if self.closed_at and (self.is_ticket or self.is_group):
