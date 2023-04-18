@@ -17,7 +17,6 @@ from chat.permissions import (permission,
                               member_permissions,
                               no_permission)
 from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, AUDIO_FORMATS
-from chat.services import user_unread_messages
 
 
 UserModel = get_user_model()
