@@ -655,15 +655,18 @@ class MessageAPIView(ListAPIView):
     serializer_class = MessageSerializer
     queryset = Message.objects.all()
     lookup_field = 'chat_room_id'
-    swagger_schema = None
 
     def list(self, request, *args, **kwargs):
+        _id_gte = self.request.GET.get('id_gte', None)
         try:
             chat_room = ChatRoom.objects.get(id=self.kwargs[self.lookup_field])
         except:
             raise Http404
         self.check_object_permissions(self.request, chat_room)
-        queryset = chat_room.chat_messages()
+        if _id_gte:
+            queryset = chat_room.chat_messages().filter(id__gte=_id_gte)
+        else:
+            queryset = chat_room.chat_messages()
         page = self.paginate_queryset(queryset)
         # seen messages in the page by request user
         seen = Message.objects.filter(id__in=[obj.id for obj in page]).seen(request.user)
