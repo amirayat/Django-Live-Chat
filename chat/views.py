@@ -668,8 +668,12 @@ class MessageAPIView(ListAPIView):
         else:
             queryset = chat_room.chat_messages()
         page = self.paginate_queryset(queryset)
-        # seen messages in the page by request user
-        seen = Message.objects.filter(id__in=[obj.id for obj in page]).seen(request.user)
+        # seen messages in the page by request user if there is not seen message
+        seen = None
+        for msg in page:
+            if not msg.seen:
+                seen = Message.objects.filter(id__in=[obj.id for obj in page]).seen(request.user)
+                break
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             resp = serializer.data
