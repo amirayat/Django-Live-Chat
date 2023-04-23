@@ -1,5 +1,5 @@
 from django_eventstream.channelmanager import DefaultChannelManager
-from core.utils import get_user_sync
+from .utils import get_user_sync
 
 
 class ChannelManager(DefaultChannelManager):

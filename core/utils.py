@@ -4,7 +4,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.serializers import TokenVerifySerializer
 from rest_framework_simplejwt.tokens import AccessToken
 from channels.db import database_sync_to_async
-from core.base_model import RootModel
+from .base_model import RootModel
 
 
 UserModel = get_user_model()

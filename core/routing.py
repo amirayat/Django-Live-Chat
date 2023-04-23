@@ -7,7 +7,7 @@ from django.conf.urls import url
 from django.urls import path
 from django_eventstream.routing import urlpatterns as sse_urlpatterns
 from chat.routing import websocket_urlpatterns
-from core.auth import TokenAuthMiddleware
+from .auth import TokenAuthMiddleware
 
 
 application = ProtocolTypeRouter({

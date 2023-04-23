@@ -1,7 +1,7 @@
 from urllib.parse import parse_qs
 from channels.middleware import BaseMiddleware
 from channels.auth import AuthMiddlewareStack
-from core.utils import get_user_async
+from .utils import get_user_async
 
 
 
