@@ -83,7 +83,8 @@ MIDDLEWARE = [
 if DEBUG:
     INSTALLED_APPS.extend([
         "query_counter",
-        "debug_toolbar"
+        "debug_toolbar",
+        "django_extensions",
     ])
     MIDDLEWARE.extend([
         "debug_toolbar.middleware.DebugToolbarMiddleware",
