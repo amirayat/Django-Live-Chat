@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'djoser',
     'drf_standardized_errors',
     'drf_yasg',
+    'encrypted_model_fields',
 
     # project apps
     'users',
@@ -341,3 +342,6 @@ CACHES = {
         "LOCATION": f"redis://{REDIS_USER}:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}",
     }
 }
+
+# https://pypi.org/project/django-encrypted-model-fields/
+FIELD_ENCRYPTION_KEY = os.getenv('FIELD_ENCRYPTION_KEY')
