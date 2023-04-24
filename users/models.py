@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import AbstractUser
+from hashid_field import HashidAutoField
 from encrypted_model_fields.fields import EncryptedCharField, EncryptedEmailField
 from chat.permissions import permission, no_permission
 from .validator import UnicodeUsernameValidator
@@ -18,6 +19,7 @@ class ChatUser(AbstractUser):
         self._action_permission = no_permission()
         super().__init__(*args, **kwargs)
 
+    id = HashidAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     photo = models.ImageField(upload_to='user_picture', null=True)
     username = models.CharField(
         _("username"),
