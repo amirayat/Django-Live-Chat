@@ -1,8 +1,9 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import AbstractUser
+from encrypted_model_fields.fields import EncryptedCharField, EncryptedEmailField
 from chat.permissions import permission, no_permission
-from users.validator import UnicodeUsernameValidator
+from .validator import UnicodeUsernameValidator
 
 
 class ChatUser(AbstractUser):
@@ -30,6 +31,11 @@ class ChatUser(AbstractUser):
             "unique": _("A user with that username already exists."),
         },
     )
+    first_name = EncryptedCharField(
+        _("first name"), max_length=150, blank=True)
+    last_name = EncryptedCharField(_("last name"), max_length=150, blank=True)
+    email = EncryptedEmailField(_("email address"), blank=True, unique=True)
+    phone = EncryptedCharField(_("phone number"), max_length=13, null=True)
 
     @property
     def role(self):
@@ -54,15 +60,15 @@ class ChatUser(AbstractUser):
          self._action_permission = action_permission
 
     def has_action_permission(self, action: str) -> bool:
-        if self.action_permission == permission(action) == no_permission():
+        if self.action_permission == no_permission():
             """
-            case of:
-                user action_permission property has not been set 
-                and
-                given action is not defined
+            user action_permission property has not been set 
             """
             return False
-        return True if self.action_permission % permission(action) == 0 else False
+        if self.action_permission % permission(action) == 0:
+            return True
+        else:
+            return False
     
     class Meta(AbstractUser.Meta):
         swappable = 'AUTH_USER_MODEL'
