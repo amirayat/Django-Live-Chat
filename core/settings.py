@@ -188,7 +188,11 @@ MEDIA_ROOT = BASE_DIR.parent / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# https://github.com/nshafer/django-hashid-field
+DEFAULT_AUTO_FIELD = 'hashid_field.BigHashidAutoField'
+HASHID_FIELD_SALT = os.getenv('HASHID_FIELD_SALT')
+HASHID_FIELD_LOOKUP_EXCEPTION = True
+HASHID_FIELD_ENABLE_HASHID_OBJECT = False
 
 # https://dj-rest-auth.readthedocs.io/en/latest/installation.html#
 REST_FRAMEWORK = {
