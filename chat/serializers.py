@@ -3,14 +3,15 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from profanity_filter import ProfanityFilter
-from chat.permissions import permission_coefficients
-from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, generate_file_pic
-from chat.models import (ChatRoom,
-                         ChatMember,
-                         FileUpload,
-                         PredefinedMessage,
-                         Report,
-                         Message)
+from hashid_field.rest import HashidSerializerCharField
+from .permissions import permission_coefficients
+from .utils import IMAGE_FORMATS, VIDEO_FORMATS, generate_file_pic
+from .models import (ChatRoom,
+                     ChatMember,
+                     FileUpload,
+                     PredefinedMessage,
+                     Report,
+                     Message)
 
 
 UserModel = get_user_model()
@@ -20,7 +21,7 @@ class UserMemberSerializer(serializers.ModelSerializer):
     """
     serializer to show chat room members
     """
-
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
     username = serializers.CharField(required=True)
 
     class Meta:
@@ -40,6 +41,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     serializer for chat room with read only members
     it is a base class for other serializer to inherit 
     """
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
     members = UserMemberSerializer(
         many=True, read_only=True, source='some_members')
 
@@ -54,6 +56,7 @@ class ChatRoomSingleMemberSerializer(serializers.ModelSerializer):
     serilizer to add single member to a chat room
     it is a base class for other serializer to inherit 
     """
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
     member = UserMemberSerializer(source='some_members')
 
     class Meta:
@@ -66,6 +69,7 @@ class AddNewMemberToChatRoomSerializer(ChatRoomSingleMemberSerializer):
     """
     serializer for staff to assign new staff
     """
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
 
     class Meta:
         model = ChatRoom
@@ -83,6 +87,7 @@ class ChatRoomMultiMemberSerializer(serializers.ModelSerializer):
     serilizer to add multiple members to a chat room
     it is a base serializer for other class to inherit 
     """
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
     members = UserMemberSerializer(many=True, source='some_members')
 
     def validate_members(self, value):
@@ -101,6 +106,7 @@ class ListChatRoomsSerializer(serializers.ModelSerializer):
     """
     serializer for list chat rooms
     """
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
 
     class Meta:
         model = ChatRoom
@@ -412,7 +418,7 @@ class UploadSerializer(serializers.ModelSerializer):
     serializer class to upload a file
     uses request.user as the resource owner
     """
-
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     def validate(self, attrs):
@@ -451,6 +457,7 @@ class PredefinedMessageSerializer(serializers.ModelSerializer):
     """
     serializer class for predefined messages
     """
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
 
     def validate(self, attrs):
         text = attrs.get("text")
@@ -481,6 +488,7 @@ class ReportSerializer(serializers.ModelSerializer):
     """
     serializer class for reports
     """
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
 
     class Meta:
         model = Report
@@ -528,7 +536,7 @@ class MessageSerializer(serializers.ModelSerializer):
     """
     serializer for message 
     """
-
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
     reply_to = ReplyToMessageSerializer(read_only=True)
     file = UploadSerializer(read_only=True, allow_null=True)
 
