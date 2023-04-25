@@ -3,6 +3,7 @@ import random
 from typing import TypeVar
 from functools import lru_cache
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 from django.dispatch import receiver
 from django.db.models.signals import post_save
@@ -10,13 +11,14 @@ from django.db.models import QuerySet, Subquery, Count, Q, F
 from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django_eventstream import send_event
+from hashid_field import HashidAutoField
 from core.base_model import RootModel, RootModelManager
-from chat.permissions import (permission,
+from .permissions import (permission,
                               creator_permissions,
                               admin_permissions,
                               member_permissions,
                               no_permission)
-from chat.utils import IMAGE_FORMATS, VIDEO_FORMATS, AUDIO_FORMATS
+from .utils import IMAGE_FORMATS, VIDEO_FORMATS, AUDIO_FORMATS
 
 
 UserModel = get_user_model()
@@ -55,17 +57,17 @@ class ChatRoomManager(RootModelManager):
         _contact = kwargs.get('contact', creator)
         _members = kwargs.get('members', list())
 
-        if type == 'USER_TICKET':
+        if _type == 'USER_TICKET':
             return self.create_ticket(name=_name, priority=_priority, creator=creator)
 
-        elif type == 'PRIVATE_CHAT':
+        elif _type == 'PRIVATE_CHAT':
             return self.create_private_chat(creator=creator, contact=_contact)
 
-        elif type == 'PUBLIC_GROUPE':
-            return self.create_group(name=_name, creator=creator, members=_members, type=type)
+        elif _type == 'PUBLIC_GROUPE':
+            return self.create_group(name=_name, creator=creator, members=_members, type=_type)
 
-        elif type == 'PRIVATE_GROUPE':
-            return self.create_group(name=_name, creator=creator, members=_members, type=type)
+        elif _type == 'PRIVATE_GROUPE':
+            return self.create_group(name=_name, creator=creator, members=_members, type=_type)
 
     def create_private_chat(self, creator: UserModel, contact: UserModel) -> ChatRoomObject:
         """
@@ -75,35 +77,35 @@ class ChatRoomManager(RootModelManager):
         """
         _name = str(creator.id)+'.'+creator.username+'_' + \
             str(contact.id)+'.'+contact.username
-        _private_chat, _is_create = ChatRoom.objects.get_or_create(
+        private_chat, is_create = ChatRoom.objects.get_or_create(
             name=_name,
             type="PRIVATE_CHAT"
         )
-        if _is_create:
+        if is_create:
             ChatMember.objects.bulk_create([
-                ChatMember(is_creator=True, chat_room=_private_chat,
+                ChatMember(is_creator=True, chat_room=private_chat,
                            user=creator),
-                ChatMember(is_creator=False, chat_room=_private_chat,
+                ChatMember(is_creator=False, chat_room=private_chat,
                            user=contact),
             ])
-        return _private_chat
+        return private_chat
 
     def create_ticket(self, name: str, priority: str, creator: UserModel) -> ChatRoomObject:
         """
         create ticket for request user
         creator: request.user
         """
-        _ticket = super().create(name=name, priority=priority, type="USER_TICKET")
+        ticket = super().create(name=name, priority=priority, type="USER_TICKET")
         # find staff with less open ticket to assing to the current ticket
-        _staff = UserModel.objects.filter(~Q(id=creator.id) & Q(is_staff=True))\
+        staff = UserModel.objects.filter(~Q(id=creator.id) & Q(is_staff=True))\
             .annotate(c=Count("user_member")).order_by("c").first()
         ChatMember.objects.bulk_create([
-            ChatMember(is_creator=True, chat_room=_ticket,
+            ChatMember(is_creator=True, chat_room=ticket,
                        user=creator),
-            ChatMember(is_creator=False, chat_room=_ticket,
-                       user=_staff),
+            ChatMember(is_creator=False, chat_room=ticket,
+                       user=staff),
         ])
-        return _ticket
+        return ticket
 
     def create_group(self, name: str, creator: UserModel, members: list, type: str) -> ChatRoomObject:
         """
@@ -112,19 +114,19 @@ class ChatRoomManager(RootModelManager):
         members: [<ChatUser: user1>, <ChatUser: user2>, ...]
         type: PUBLIC_GROUPE or PRIVATE_GROUPE
         """
-        _group = super().create(name=name, type=type)
+        group = super().create(name=name, type=type)
         # create members
-        _all_members = [ChatMember(is_creator=True,
-                                   is_admin=False,
-                                   chat_room=_group,
-                                   user=creator,
-                                   action_permission=creator_permissions())] + \
+        all_members = [ChatMember(is_creator=True,
+                                  is_admin=False,
+                                  chat_room=group,
+                                  user=creator,
+                                  action_permission=creator_permissions())] + \
             [ChatMember(is_creator=False,
-                        chat_room=_group,
+                        chat_room=group,
                         user=member)
              for member in members if member.id != creator.id]
-        ChatMember.objects.bulk_create(_all_members)
-        return _group
+        ChatMember.objects.bulk_create(all_members)
+        return group
 
 
 class ChatRoom(RootModel):
@@ -149,6 +151,7 @@ class ChatRoom(RootModel):
         ("PRIVATE_CHAT", "PRIVATE_CHAT"),
     )
 
+    id = HashidAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     photo = models.ImageField(upload_to='group_picture', null=True)
     name = models.CharField(max_length=32)
     closed = models.BooleanField(default=False)
@@ -158,6 +161,7 @@ class ChatRoom(RootModel):
     type = models.CharField(
         max_length=14, choices=chatroom_type, default="USER_TICKET")
     read_only = models.BooleanField(default=False)
+    members = models.ManyToManyField(settings.AUTH_USER_MODEL, through='ChatMember')
 
     objects = ChatRoomManager()
 
@@ -212,12 +216,12 @@ class ChatRoom(RootModel):
         """
         return list of all chat room users
         """
-        _query_set = self.chat_member.select_related("user")
-        for obj in _query_set:
-            obj.user.role = obj.role
-            obj.user.action_permission = obj.action_permission
-        _all_users = [obj.user for obj in _query_set]
-        return _all_users
+        query_set = self.chat_member.select_related("user")
+        for member in query_set:
+            member.user.role = member.role
+            member.user.action_permission = member.action_permission
+        all_users = [member.user for member in query_set]
+        return all_users
 
     @property
     def some_members(self) -> list:
@@ -246,7 +250,7 @@ class ChatRoom(RootModel):
                 chat_room_id=self.id,
                 user_id=user_id)
             return True
-        except:
+        except ChatMember.DoesNotExist:
             return False
 
     @property
@@ -398,7 +402,7 @@ class ChatRoom(RootModel):
                     defaults={'is_deleted': False}
                 )
                 return True
-            except:
+            except ChatMember.DoesNotExist:
                 return False
         return False
 
@@ -420,7 +424,7 @@ class ChatRoom(RootModel):
                     defaults={'is_deleted': False}
                 )
                 return True
-            except:
+            except ChatMember.DoesNotExist:
                 return False
         return False
 
@@ -464,13 +468,14 @@ class ChatRoom(RootModel):
         """
         return queryset of chat room messages
         """
-        return self.chat_room_message.select_related('file', 'reply_to').order_by('created_at')
+        return self.chat_room_message.prefetch_related('file', 'mentions', 'reply_to').order_by('created_at')
 
     def count_until_last_seen(self, user: UserModel) -> int:
         """
         count user seen messages to find offset for message list
         """
-        first_not_seen = self.chat_messages().filter(Q(seen=False) & ~Q(sender=user))[:1]
+        first_not_seen = self.chat_messages().filter(
+            Q(seen=False) & ~Q(sender=user))[:1]
         count = self.chat_messages() \
             .filter(created_at__lt=Subquery(first_not_seen.values('created_at'))).count()
         if count == 0:
@@ -512,12 +517,13 @@ class ChatMember(RootModel):
     """
     class model for chat room members
     """
+    id = HashidAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     is_creator = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)
-    action_permission = models.IntegerField(default=221)
+    action_permission = models.IntegerField(default=member_permissions())
     chat_room = models.ForeignKey(ChatRoom, related_name=_(
         'chat_member'), on_delete=models.CASCADE)
-    user = models.ForeignKey(UserModel, related_name=_(
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name=_(
         'user_member'), on_delete=models.CASCADE)
 
     objects = RootModelManager()
@@ -555,7 +561,8 @@ class FileUpload(RootModel):
     chat file upload
     """
 
-    user = models.ForeignKey(UserModel, related_name=_(
+    id = HashidAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name=_(
         'user_upload'), on_delete=models.CASCADE)
     file = models.FileField(upload_to=_('file'))
     file_pic = models.ImageField(upload_to=_('file_picture'), null=True)
@@ -572,7 +579,7 @@ class FileUpload(RootModel):
         """
         return file format
         """
-        return self.file.name.split(".")[-1]
+        return self.file.name.split(".")[-1].lower()
 
     @property
     def file_type(self) -> str:
@@ -611,6 +618,7 @@ class PredefinedMessage(RootModel):
     """
     class model for predefind message
     """
+    id = HashidAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     text = models.TextField(null=True)
     file = models.OneToOneField(
         FileUpload, related_name=_('file_predefinedmessage'), on_delete=models.SET_NULL, null=True)
@@ -623,11 +631,12 @@ class Report(RootModel):
     """
     class model for report message
     """
+    id = HashidAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     message = models.ForeignKey(
         PredefinedMessage, related_name=_('report_message'), on_delete=models.CASCADE)
-    reporter = models.ForeignKey(UserModel, related_name=_(
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, related_name=_(
         'reporter'), on_delete=models.DO_NOTHING)
-    group = models.ForeignKey(UserModel, related_name=_(
+    group = models.ForeignKey(settings.AUTH_USER_MODEL, related_name=_(
         'group'), on_delete=models.DO_NOTHING)
 
     class Meta:
@@ -679,37 +688,50 @@ class Message(RootModel):
         ("TYPING", "TYPING"),
         ("SENDING", "SENDING"),
     )
+    id = HashidAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     type = models.CharField(max_length=7, choices=message_type)
     text = models.TextField(null=True)
     seen = models.BooleanField(default=False)
-    seen_at = models.DateTimeField(null=True)
     file = models.OneToOneField(FileUpload, related_name=_(
-        'message_file'), on_delete=models.CASCADE, null=True)
-    chat_room = models.ForeignKey(ChatRoom, related_name=_(
-        'chat_room_message'), on_delete=models.CASCADE)
-    sender = models.ForeignKey(UserModel, related_name=_(
-        'message_sender'), on_delete=models.CASCADE)
+        'message_file'), on_delete=models.SET_NULL, null=True)
+    member = models.ForeignKey(ChatMember, related_name=_(
+        'memeber_message'), on_delete=models.CASCADE)
     reply_to = models.ForeignKey('self', related_name=_(
         'reply_to_message'), on_delete=models.SET_NULL, null=True)
+    mentions = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, through='Mention', related_name=_('user_mentions'))
+    unseen_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, through='UnSeen', related_name=_('user_unseen'))
 
     objects = MessageManager()
 
     def save(self, *args, **kwargs) -> None:
-        if self.seen_at or self.type not in ["TEXT", "FILE"]:
+        if self.type not in ["TEXT", "FILE"]:
             """
             save nothing if it has been seen before
             don't save message unless of type TEXT or FILE 
             """
             return None
-        if self.seen:
-            """
-            record seen time
-            """
-            self.seen_at = timezone.now()
         return super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'chat_messages'
+
+
+class UnSeen(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'unseen'
+
+
+class Mention(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'mentions'
 
 
 def user_unread_messages(user: UserModel) -> dict:
@@ -754,4 +776,4 @@ def sse_signal(sender, instance, **kwargs):
         for user in members:
             if user:
                 send_event('unread_messages_{}'.format(user.id),
-                        'message', user_unread_messages(user))
+                           'message', user_unread_messages(user))
