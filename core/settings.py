@@ -250,7 +250,7 @@ DJOSER = {
         'username_reset': 'djoser.serializers.SendEmailResetSerializer',
         'username_reset_confirm': 'djoser.serializers.UsernameResetConfirmSerializer',
         'username_reset_confirm_retype': 'djoser.serializers.UsernameResetConfirmRetypeSerializer',
-        'user_create': 'djoser.serializers.UserCreateSerializer',
+        'user_create': 'users.serializers.ChatUserCreateSerializer',
         'user_create_password_retype': 'djoser.serializers.UserCreatePasswordRetypeSerializer',
         'user_delete': 'djoser.serializers.UserDeleteSerializer',
         'user': 'users.serializers.ChatUserSerializer',
