@@ -6,10 +6,10 @@ from django.db.models import Q
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 from django_eventstream import send_event
-from chat.models import ChatRoom
-from chat.models import Message, unread_messages
-from chat.serializers import MessageContentSerializer
-from chat.serializers import MessageSerializer
+from .models import ChatRoom
+from .models import Message, unread_messages
+from .serializers import MessageContentSerializer
+from .serializers import MessageSerializer
 from dotenv import load_dotenv
 
 
