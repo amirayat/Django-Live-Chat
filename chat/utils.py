@@ -6,22 +6,26 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.storage import FileSystemStorage
 
 
-image_formats = ["jpg", "jpeg", "png", "gif", "tiff"]
-video_formats = ["mp4", "mkv", "avi", "flv", "f4v", "swf", "wmv", "mov"]
-audio_formats = ["pcm", "wav", "aiff", "mp3",
+IMAGE_FORMATS = ["jpg", "jpeg", "png", "gif", "tiff"]
+VIDEO_FORMATS = ["mp4", "mkv", "avi", "flv", "f4v", "swf", "wmv", "mov"]
+AUDIO_FORMATS = ["pcm", "wav", "aiff", "mp3",
                  "aac", "ogg", "wma", "flac", "alac"]
+FILE_FORMATS = [".txt", ".xls", ".xlsx", ".ppt", ".pptx",
+                ".doc", ".docx", ".pdf", ".odt", ".odp", ".ods"]
+INVALID_FORMATS = [".php", ".php2", ".php3", ".php4", ".php5",
+                   ".php6", ".php7", ".phps", ".phps", ".pht",
+                   ".phtm", ".phtml", ".pgif", ".shtml", ".htaccess",
+                   ".phar", ".inc", ".hphp", ".ctp", ".module",
+                   ".asp", ".aspx", ".config", ".ashx", ".asmx",
+                   ".aspq", ".axd", ".cshtm", ".cshtml", ".rem",
+                   ".soap", ".vbhtm", ".vbhtml", ".asa", ".cer",
+                   ".shtml", ".jsp", ".jspx", ".jsw", ".jsv",
+                   ".jspf", ".wss", ".do", ".action", ".cfm",
+                   ".cfml", ".cfc", '.dbm', ".swf", ".pl",
+                   ".cgi", ".yaws", ".exe", ".bat", ".msi",
+                   ".tar", ".zip", ".rar"]
 
-IMAGE_FORMATS = list()
-for format in image_formats:
-    IMAGE_FORMATS.extend([format, format.upper()])
-
-VIDEO_FORMATS = list()
-for format in video_formats:
-    VIDEO_FORMATS.extend([format, format.upper()])
-
-AUDIO_FORMATS = list()
-for format in audio_formats:
-    AUDIO_FORMATS.extend([format, format.upper()])
+ALL_ACCEPTABLE_FORMATS = IMAGE_FORMATS+VIDEO_FORMATS+AUDIO_FORMATS+FILE_FORMATS
 
 
 def resize_image(image: Image) -> Image:
@@ -103,5 +107,3 @@ def generate_file_pic(file: InMemoryUploadedFile) -> InMemoryUploadedFile:
         return iobytes_to_InMemoryUploadedFile(iobytes)
     except:
         return None
-
-
