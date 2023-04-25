@@ -149,10 +149,11 @@ class IsAuthenticatedNotStaff(IsAuthenticated):
         return bool(request.user and request.user.is_authenticated and not request.user.is_staff)
 
 
-# class IsMessageSender(IsAuthenticated):
-#     """
-#     permission for message sender
-#     """
+class IsMessageSender(IsAuthenticated):
+    """
+    permission for message sender
+    """
 
-#     def has_object_permission(self, request, view, obj):
-#         if request.user == obj.chat_member.
+    def has_object_permission(self, request, view, obj):
+        if request.user == obj.member.user:
+            return True
