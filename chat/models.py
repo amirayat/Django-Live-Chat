@@ -138,13 +138,13 @@ class ChatRoom(RootModel):
         self._member = None
         super().__init__(*args, **kwargs)
 
-    ticket_priority = (
+    TICKET_PRIORITY = (
         ("LOW", "LOW"),
         ("MEDIUM", "MEDIUM"),
         ("HIGH", "HIGH"),
     )
 
-    chatroom_type = (
+    CHATROOM_TYPE = (
         ("USER_TICKET", "USER_TICKET"),
         ("PUBLIC_GROUPE", "PUBLIC_GROUPE"),
         ("PRIVATE_GROUPE", "PRIVATE_GROUPE"),
@@ -157,9 +157,9 @@ class ChatRoom(RootModel):
     closed = models.BooleanField(default=False)
     closed_at = models.DateTimeField(null=True)
     priority = models.CharField(
-        max_length=6, choices=ticket_priority, default=None, null=True)
+        max_length=6, choices=TICKET_PRIORITY, default=None, null=True)
     type = models.CharField(
-        max_length=14, choices=chatroom_type, default="USER_TICKET")
+        max_length=14, choices=CHATROOM_TYPE, default="USER_TICKET")
     read_only = models.BooleanField(default=False)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, through='ChatMember')
 
@@ -680,7 +680,7 @@ class Message(RootModel):
     """
     chat message
     """
-    message_type = (
+    MESSAGE_TYPE = (
         ("TEXT", "TEXT"),
         ("FILE", "FILE"),
         ("ONLINE", "ONLINE"),
@@ -689,7 +689,7 @@ class Message(RootModel):
         ("SENDING", "SENDING"),
     )
     id = HashidAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
-    type = models.CharField(max_length=7, choices=message_type)
+    type = models.CharField(max_length=7, choices=MESSAGE_TYPE)
     text = models.TextField(null=True)
     seen = models.BooleanField(default=False)
     file = models.OneToOneField(FileUpload, related_name=_(
