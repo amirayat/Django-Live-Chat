@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from djoser.conf import settings
-from djoser.serializers import UserSerializer
+from djoser.serializers import UserSerializer, UserCreateSerializer
 from hashid_field.rest import HashidSerializerCharField
 
 
@@ -19,3 +19,13 @@ class ChatUserSerializer(UserSerializer):
             settings.LOGIN_FIELD,
             'photo'     ### add photo to fields
         )
+
+
+class ChatUserCreateSerializer(UserCreateSerializer):
+    """
+    hash id version of djozer UserCreateSerializer serializer
+    """
+    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+
+    class Meta(UserCreateSerializer.Meta):
+        pass
