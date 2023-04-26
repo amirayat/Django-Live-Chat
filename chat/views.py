@@ -1,58 +1,58 @@
 from functools import lru_cache
 from django.conf import settings
 from django.http import Http404
-from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
+from django.db.models import Q, Subquery
 from rest_framework import status, exceptions
 from rest_framework.response import Response
 from rest_framework.generics import RetrieveUpdateAPIView, UpdateAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.permissions import IsAdminUser as IsStaff
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, ListModelMixin
-from chat.models import ChatRoom, ChatMember, FileUpload, PredefinedMessage, Report, Message
-from chat.serializers import (ChatRoomSerializer,
-                              ListGroupSerializer,
-                              ListPrivateChatSerializer,
-                              ListTicketSerializer,
-                              GroupSingleMemberSerializer,
-                              CreateGroupSerializer, 
-                              MessageSerializer, 
-                              PredefinedMessageSerializer,
-                              PrivateChatSerializer, 
-                              ReportSerializer,
-                              TicketSerializer,
-                              AddNewMemberToChatRoomSerializer,
-                              UpdateGroupSerializer,
-                              AdminSerializer,
-                              MemberSerializer, 
-                              UploadSerializer,
-                              ListChatRoomsSerializer)
-from chat.permissions import (IsAdmin_CanAdd,
-                              IsAdmin_CanClose,
-                              IsAdmin_CanLock,
-                              IsAdmin_CanRemove,
-                              IsAdmin_CanUpdate,
-                              IsCreator,
-                              IsMember,
-                              IsMemberNotStaff,
-                              IsAuthenticatedNotStaff,
-                              permission)
+from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin, ListModelMixin
+from .models import ChatRoom, ChatMember, FileUpload, PredefinedMessage, Report, Message
+from .serializers import (ChatRoomSerializer,
+                          ListGroupSerializer,
+                          ListPrivateChatSerializer,
+                          ListTicketSerializer,
+                          GroupSingleMemberSerializer,
+                          CreateGroupSerializer,
+                          MessageSerializer,
+                          PredefinedMessageSerializer,
+                          PrivateChatSerializer,
+                          ReportSerializer,
+                          TicketSerializer,
+                          AddNewMemberToChatRoomSerializer,
+                          UpdateGroupSerializer,
+                          AdminSerializer,
+                          MemberPermissionSerializer,
+                          UploadSerializer,
+                          ListChatRoomsSerializer)
+from .permissions import (IsAdmin_CanAdd,
+                          IsAdmin_CanClose,
+                          IsAdmin_CanLock,
+                          IsAdmin_CanRemove,
+                          IsAdmin_CanUpdate,
+                          IsCreator,
+                          IsMember,
+                          IsMemberNotStaff,
+                          IsAuthenticatedNotStaff, IsMessageSender,
+                          permission)
 
 
 UserModel = get_user_model()
 
 
-###•••••••••••••••••••••••••••
+# •••••••••••••••••••••••••••
 # BASE CLASSES FOR OTHER VIEWS
-###•••••••••••••••••••••••••••
+# •••••••••••••••••••••••••••
 class AddNewMemberAPIView(UpdateAPIView):
     """
     add new member to chat room
-    it is a base class for other views to inherit 
+    it is a base class for other views to inherit
     """
     permission_classes = None
     serializer_class = None
@@ -73,7 +73,7 @@ class AddNewMemberAPIView(UpdateAPIView):
         try:
             user = UserModel.objects.get(
                 username=_username, is_staff=self.is_staff_filter)
-        except:
+        except UserModel.DoesNotExist:
             raise Http404
         # add new member
         result = instance.add_new_member(user)
@@ -89,7 +89,7 @@ class AddNewMemberAPIView(UpdateAPIView):
 class MemberManagementAPIView(UpdateAPIView):
     """
     view to manage members
-    it is a base class for other views to inherit 
+    it is a base class for other views to inherit
     """
     permission_classes = None
     serializer_class = GroupSingleMemberSerializer
@@ -117,7 +117,7 @@ class MemberManagementAPIView(UpdateAPIView):
         _username = serializer.validated_data.get('some_members')['username']
         try:
             member = UserModel.objects.get(username=_username)
-        except:
+        except UserModel.DoesNotExist:
             raise Http404
         # promote member
         result = self.operation(member)
@@ -138,12 +138,12 @@ class UserChatRoomsAPIView(ListAPIView):
         return super().get_queryset().filter(chat_member__user=self.request.user)
 
 
-###•••••••••••
+# •••••••••••
 # USER_TICKET
-###•••••••••••
+# •••••••••••
 class TicketViewSet(ModelViewSet):
     """
-    viewset for ticket 
+    viewset for ticket
     """
     permission_classes = [IsAuthenticated]
     serializer_class = TicketSerializer
@@ -194,7 +194,7 @@ class TicketViewSet(ModelViewSet):
 
 class CloseLockTicketAPIView(UpdateAPIView):
     """
-    close and lock ticket by creator view 
+    close and lock ticket by creator view
     """
     permission_classes = [IsCreator]
     serializer_class = ChatRoomSerializer
@@ -220,15 +220,15 @@ class AssignStaffToTicketAPIView(AddNewMemberAPIView):
     is_staff_filter = True
 
 
-###•••••••••••
+# •••••••••••
 # PRIVATE_CHAT
-###•••••••••••
+# •••••••••••
 class PrivateChatViewSet(CreateModelMixin,
                          RetrieveModelMixin,
                          ListModelMixin,
                          GenericViewSet):
     """
-    viewset for private chat 
+    viewset for private chat
     """
     permission_classes = [IsMemberNotStaff]
     serializer_class = PrivateChatSerializer
@@ -256,7 +256,7 @@ class PrivateChatViewSet(CreateModelMixin,
         try:
             _contact = UserModel.objects.get(
                 username=_username, is_staff=False)
-        except:
+        except UserModel.DoesNotExist:
             raise Http404
         if request.user == _contact:
             raise exceptions.NotAcceptable("Self-chat is not allowed.")
@@ -299,9 +299,9 @@ class UnBlockUserAPIView(UpdateAPIView):
         return Response({"status": "Done"})
 
 
-###•••••••••••
+# •••••••••••
 # GROUPE
-###•••••••••••
+# •••••••••••
 class TopPublicGroupViewSet(ListAPIView):
     """
     list of top public groups
@@ -321,7 +321,7 @@ class GroupViewSet(CreateModelMixin,
                    DestroyModelMixin,
                    GenericViewSet):
     """
-    viewset for groups 
+    viewset for groups
     """
     permission_classes = [IsAuthenticated]
     serializer_class = CreateGroupSerializer
@@ -384,7 +384,7 @@ class GroupUpdateAPIView(UpdateAPIView):
 
 class CloseGroupAPIView(UpdateAPIView):
     """
-    close group by creator view 
+    close group by creator view
     the group will not accept new member
     """
     permission_classes = [IsAdmin_CanClose | IsCreator]
@@ -511,10 +511,10 @@ class DemoteAdminAPIView(MemberManagementAPIView):
 
 class MemberActionPermissionAPIView(RetrieveUpdateAPIView):
     """
-    view for a member with action permissions 
+    view for a member with action permissions
     """
     permission_classes = [IsCreator]
-    serializer_class = MemberSerializer
+    serializer_class = MemberPermissionSerializer
     queryset = ChatRoom.objects.filter(
         type__in=['PUBLIC_GROUPE', 'PRIVATE_GROUPE'])
     lookup_field = 'id'
@@ -522,7 +522,7 @@ class MemberActionPermissionAPIView(RetrieveUpdateAPIView):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         if instance.member.role == "member":
-            serializer = MemberSerializer(instance)
+            serializer = MemberPermissionSerializer(instance)
         else:
             serializer = AdminSerializer(instance)
         return Response(serializer.data)
@@ -542,7 +542,7 @@ class MemberActionPermissionAPIView(RetrieveUpdateAPIView):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         if instance.member.role == "member":
-            serializer = MemberSerializer(
+            serializer = MemberPermissionSerializer(
                 instance, data=request.data, partial=partial)
         else:
             serializer = AdminSerializer(
@@ -563,13 +563,13 @@ class MemberActionPermissionAPIView(RetrieveUpdateAPIView):
         return Response({"status": "Done"})
 
 
-###•••••••••••
+# •••••••••••
 # FILE UPLOAD
-###•••••••••••
-class FileUploadView(CreateModelMixin,
-                     RetrieveModelMixin,
-                     DestroyModelMixin,
-                     GenericViewSet):
+# •••••••••••
+class FileUploadViewSet(CreateModelMixin,
+                        RetrieveModelMixin,
+                        DestroyModelMixin,
+                        GenericViewSet):
     """
     user uploads a file
     """
@@ -581,12 +581,12 @@ class FileUploadView(CreateModelMixin,
         return super().get_queryset().filter(user=self.request.user)
 
 
-###•••••••••••
+# •••••••••••
 # Predefined Message
-###•••••••••••
+# •••••••••••
 class PredefinedMessageViewSet(ModelViewSet):
     """
-    viewset for predefined messages 
+    viewset for predefined messages
     """
     permission_classes = [IsStaff]
     serializer_class = PredefinedMessageSerializer
@@ -597,9 +597,9 @@ class PredefinedMessageViewSet(ModelViewSet):
         return super().list(request, *args, **kwargs)
 
 
-###•••••••••••
+# •••••••••••
 # Report
-###•••••••••••
+# •••••••••••
 class ReportViewSet(ModelViewSet):
     """
     viewset for reports
@@ -611,7 +611,7 @@ class ReportViewSet(ModelViewSet):
     def get_queryset(self):
         if self.request.user.is_staff:
             return super().get_queryset()
-        return super().get_queryset().filter(reporter = self.request.user)
+        return super().get_queryset().filter(reporter=self.request.user)
 
     def get_permissions(self):
         if self.action in ['retrieve', 'create', 'destroy', 'update']:
@@ -625,62 +625,80 @@ class ReportViewSet(ModelViewSet):
         return super().list(request, *args, **kwargs)
 
 
-###•••••••••••
+# •••••••••••
 # Message
-###•••••••••••
+# •••••••••••
 class LastSeenOffsetAPIView(RetrieveAPIView):
     """
     to find last seen massage offset for MessageView
     """
     permission_classes = [IsMember]
     serializer_class = None
-    queryset = Message.objects.all()
-    lookup_field = 'chat_room_id'
+    queryset = ChatRoom.objects.all()
+    lookup_field = 'id'
 
     def retrieve(self, request, *args, **kwargs):
-        limit = int(request.GET.get('limit', settings.REST_FRAMEWORK.get('PAGE_SIZE', '5')))
-        try:
-            count_until_last_seen = ChatRoom.objects.get(id=self.kwargs[self.lookup_field]) \
-                .count_until_last_seen(request.user)
-            return Response({'limit':limit, 'offset':count_until_last_seen//limit*limit})
-        except:
-            raise Http404
+        limit = int(request.GET.get(
+            'limit', settings.REST_FRAMEWORK.get('PAGE_SIZE', '5')))
+        chat_room = self.get_object()
+        chat_messages = Message.objects.filter(member__chat_room=chat_room)
+        first_not_seen = chat_messages.filter(
+            Q(seen=False) & ~Q(member__user=request.user))[:1]
+        count = chat_messages.filter(created_at__lt=Subquery(
+            first_not_seen.values('created_at'))).count()
+        if count == 0:
+            count = chat_messages.count() - 1
+        offset = count//limit*limit
+        return Response({'limit': limit, 'offset': offset})
 
 
-class MessageAPIView(ListAPIView):
+class MessageViewSet(ListModelMixin,
+                     UpdateModelMixin,
+                     DestroyModelMixin,
+                     GenericViewSet):
     """
-    view class to list ticket messages
+    view class for messages
     """
     permission_classes = [IsMember]
     serializer_class = MessageSerializer
     queryset = Message.objects.all()
-    lookup_field = 'chat_room_id'
+    lookup_field = 'id'
+
+    def get_permissions(self):
+        if self.action in ['list']:
+            self.permission_classes = [IsMember]
+        else:
+            self.permission_classes = [IsMessageSender]
+        return super().get_permissions()
 
     def list(self, request, *args, **kwargs):
         _id_gte = self.request.GET.get('id_gte', None)
         try:
             chat_room = ChatRoom.objects.get(id=self.kwargs[self.lookup_field])
-        except:
+        except ChatRoom.DoesNotExist:
             raise Http404
         self.check_object_permissions(self.request, chat_room)
+        queryset = Message.objects.filter(member__chat_room=chat_room)\
+            .prefetch_related('member__user', 'file', 'mentions', 'reply_to').order_by('created_at')
         if _id_gte:
-            queryset = chat_room.chat_messages().filter(id__gte=_id_gte)
-        else:
-            queryset = chat_room.chat_messages()
+            queryset = queryset.filter(id__gte=_id_gte)
         page = self.paginate_queryset(queryset)
+
         # seen messages in the page by request user if there is not seen message
-        seen = None
-        for msg in page:
+        seen_messages = list()
+        for i, msg in enumerate(page):
             if not msg.seen:
-                seen = Message.objects.filter(id__in=[obj.id for obj in page]).seen(request.user)
-                break
+                # msg.seen_message()
+                # seen_messages.append(i)
+                pass
+
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            resp = serializer.data
-            if seen:
-                for obj in resp:
+            response_data = serializer.data
+            for i, obj in enumerate(response_data):
+                if i in seen_messages:
                     obj['seen'] = True
-            return self.get_paginated_response(resp)
+            return self.get_paginated_response(response_data)
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
