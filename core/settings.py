@@ -193,7 +193,6 @@ MEDIA_ROOT = BASE_DIR.parent / 'media'
 # https://github.com/nshafer/django-hashid-field
 DEFAULT_AUTO_FIELD = 'hashid_field.BigHashidAutoField'
 HASHID_FIELD_SALT = os.getenv('HASHID_FIELD_SALT')
-HASHID_FIELD_LOOKUP_EXCEPTION = True
 HASHID_FIELD_ENABLE_HASHID_OBJECT = False
 
 # https://dj-rest-auth.readthedocs.io/en/latest/installation.html#
