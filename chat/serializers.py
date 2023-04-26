@@ -5,7 +5,8 @@ from rest_framework import serializers
 from profanity_filter import ProfanityFilter
 from hashid_field.rest import HashidSerializerCharField
 from .permissions import permission_coefficients
-from .utils import IMAGE_FORMATS, VIDEO_FORMATS, generate_file_pic
+from .utils import IMAGE_FORMATS, VIDEO_FORMATS
+from .tasks import generate_file_pic_task
 from .models import (ChatRoom,
                      ChatMember,
                      FileUpload,
@@ -433,7 +434,7 @@ class UploadSerializer(serializers.ModelSerializer):
         _file = validated_data.get('file')
         _format = _file.name.split(".")[-1]
         if _format in IMAGE_FORMATS+VIDEO_FORMATS:
-            validated_data['file_pic'] = generate_file_pic(_file)
+            validated_data['file_pic'] = generate_file_pic_task(_file)
         return super().create(validated_data)
 
     class Meta:
