@@ -25,6 +25,8 @@ REDIS_PORT = os.getenv('REDIS_PORT')
 REDIS_DB = os.getenv('REDIS_DB')
 REDIS_USER = os.getenv('REDIS_USER')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+REDIS_ADDRESS = os.getenv('REDIS_ADDRESS')
+POSTGRES_ADDRESS = os.getenv('POSTGRES_ADDRESS')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -343,9 +345,17 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = int(
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://{REDIS_USER}:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}",
+        "LOCATION": REDIS_ADDRESS,
     }
 }
 
 # https://pypi.org/project/django-encrypted-model-fields/
 FIELD_ENCRYPTION_KEY = os.getenv('FIELD_ENCRYPTION_KEY')
+
+# https://docs.celeryq.dev/en/latest/django/first-steps-with-django.html#using-celery-with-django
+# Celery Configuration Options
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_BROKER_URL = REDIS_ADDRESS
+CELERY_RESULT_BACKEND = POSTGRES_ADDRESS
