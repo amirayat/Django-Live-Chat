@@ -22,7 +22,8 @@ class UserMemberSerializer(serializers.ModelSerializer):
     """
     serializer to show chat room members
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
     username = serializers.CharField(required=True)
 
     class Meta:
@@ -42,7 +43,8 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     serializer for chat room with read only members
     it is a base class for other serializer to inherit 
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
     members = UserMemberSerializer(
         many=True, read_only=True, source='some_members')
 
@@ -57,7 +59,8 @@ class ChatRoomSingleMemberSerializer(serializers.ModelSerializer):
     serilizer to add single member to a chat room
     it is a base class for other serializer to inherit 
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
     member = UserMemberSerializer(source='some_members')
 
     class Meta:
@@ -70,7 +73,8 @@ class AddNewMemberToChatRoomSerializer(ChatRoomSingleMemberSerializer):
     """
     serializer for staff to assign new staff
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
 
     class Meta:
         model = ChatRoom
@@ -88,7 +92,8 @@ class ChatRoomMultiMemberSerializer(serializers.ModelSerializer):
     serilizer to add multiple members to a chat room
     it is a base serializer for other class to inherit 
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
     members = UserMemberSerializer(many=True, source='some_members')
 
     def validate_members(self, value):
@@ -107,7 +112,8 @@ class ListChatRoomsSerializer(serializers.ModelSerializer):
     """
     serializer for list chat rooms
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
 
     class Meta:
         model = ChatRoom
@@ -395,7 +401,7 @@ class AdminSerializer(serializers.ModelSerializer):
         ]
 
 
-class MemberSerializer(serializers.ModelSerializer):
+class MemberPermissionSerializer(serializers.ModelSerializer):
     """
     serializer for chat member with all action permissions
     """
@@ -414,12 +420,27 @@ class MemberSerializer(serializers.ModelSerializer):
         ]
 
 
+class MemberUserSerializer(serializers.ModelSerializer):
+    """
+    serializer for chat member with all action permissions
+    """
+    user = UserMemberSerializer()
+
+    class Meta:
+        model = ChatMember
+        fields = [
+            "user",
+            "role"
+        ]
+
+
 class UploadSerializer(serializers.ModelSerializer):
     """
     serializer class to upload a file
     uses request.user as the resource owner
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     def validate(self, attrs):
@@ -458,7 +479,8 @@ class PredefinedMessageSerializer(serializers.ModelSerializer):
     """
     serializer class for predefined messages
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
 
     def validate(self, attrs):
         text = attrs.get("text")
@@ -489,7 +511,8 @@ class ReportSerializer(serializers.ModelSerializer):
     """
     serializer class for reports
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
 
     class Meta:
         model = Report
@@ -509,13 +532,13 @@ class ReplyToMessageSerializer(serializers.ModelSerializer):
     """
     serializer for reply to message 
     """
-
     url = serializers.SerializerMethodField()
     file = UploadSerializer(read_only=True, allow_null=True)
 
     def get_url(self, object):
         return reverse(viewname="message-list",
-                       kwargs={"chat_room_id": object.chat_room_id},
+                       kwargs={
+                           "chat_room_id": self.context['request'].parser_context['kwargs']['chat_room_id']},
                        request=self.context['request']) + \
             "?id_gte=" + str(object.id)
 
@@ -523,23 +546,24 @@ class ReplyToMessageSerializer(serializers.ModelSerializer):
         model = Message
         read_only_fields = [
             "url",
-            "sender",
             "created_at",
-        ]
-        fields = read_only_fields + [
             "type",
             "text",
             "file",
         ]
+        fields = read_only_fields
 
 
 class MessageSerializer(serializers.ModelSerializer):
     """
     serializer for message 
     """
-    id = HashidSerializerCharField(source_field='users.ChatUser.id', read_only=True)
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
     reply_to = ReplyToMessageSerializer(read_only=True)
     file = UploadSerializer(read_only=True, allow_null=True)
+    member = MemberUserSerializer(read_only=True)
+    mentions = UserMemberSerializer(many=True, read_only=True)
 
     def validate(self, attrs):
         type = attrs.get("type")
@@ -559,14 +583,13 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "seen",
-            "seen_at",
-            "chat_room",
-            "sender",
-            "created_at"
+            "member",
+            "created_at",
         ]
         fields = read_only_fields + [
             "type",
             "text",
             "file",
             "reply_to",
+            "mentions"
         ]
