@@ -463,24 +463,6 @@ class ChatRoom(RootModel):
             return True
         return False
 
-    def chat_messages(self) -> QuerySet:
-        """
-        return queryset of chat room messages
-        """
-        return self.chat_room_message.prefetch_related('file', 'mentions', 'reply_to').order_by('created_at')
-
-    def count_until_last_seen(self, user: UserModel) -> int:
-        """
-        count user seen messages to find offset for message list
-        """
-        first_not_seen = self.chat_messages().filter(
-            Q(seen=False) & ~Q(sender=user))[:1]
-        count = self.chat_messages() \
-            .filter(created_at__lt=Subquery(first_not_seen.values('created_at'))).count()
-        if count == 0:
-            count = self.chat_messages().count() - 1
-        return count
-
     def save(self, *args, **kwargs) -> None:
         if self.closed_at and (self.is_ticket or self.is_group):
             """
@@ -646,35 +628,6 @@ class Report(RootModel):
         ]
 
 
-class MessageQuerySet(models.query.QuerySet):
-    """
-    custom QuerySet for Message model
-    """
-
-    def seen(self, user: UserModel) -> int:
-        """
-        user: request.user
-        """
-        if user.is_staff:
-            """
-            in case of TICKET, staff user doesn't mark other staff messages as seen 
-            """
-            return self.filter(seen_at__isnull=True) \
-                .exclude(sender__is_staff=True).update(seen=True, seen_at=timezone.now())
-        else:
-            return self.filter(seen_at__isnull=True) \
-                .exclude(sender=user).update(seen=True, seen_at=timezone.now())
-
-
-class MessageManager(models.manager.BaseManager.from_queryset(MessageQuerySet)):
-    """
-    custom manager for Message model
-    """
-
-    def get_queryset(self):
-        return super().get_queryset().filter(is_deleted=False)
-
-
 class Message(RootModel):
     """
     chat message
@@ -702,7 +655,22 @@ class Message(RootModel):
     unseen_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through='UnSeen', related_name=_('user_unseen'))
 
-    objects = MessageManager()
+    def mark_as_seen(self) -> None:
+        """
+        turn message seen field to true
+        """
+        self.seen = True
+        self.save()
+
+    def seen_message(self, user: UserModel) -> None:
+        """
+        user: request.user
+        """
+        if self.unseen_users.filter(user=user).exists():
+            self.unseen_users.remove(user)
+            if not self.unseen_users.exists():
+                self.mark_as_seen()
+                return True
 
     def save(self, *args, **kwargs) -> None:
         if self.type not in ["TEXT", "FILE"]:
@@ -753,7 +721,7 @@ def user_unread_messages(user: UserModel) -> dict:
         .order_by('chat_room', '-created_at') \
         .distinct('chat_room').values('chat_room', 'text', 'type', 'created_at')
     # user chat rooms not seen messages count
-    not_seen_messages = Message.objects.filter(~Q(sender=user) & Q(seen=False)).values('chat_room') \
+    not_seen_messages = Message.objects.filter(~Q(member__user=user) & Q(seen=False)).values('chat_room') \
         .annotate(unread_messages=Count('seen'))
     # concat last_messages and not_seen_messages based on chat_room
     for obj in last_messages:
