@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from django.dispatch import receiver
 from django.db.models.signals import post_save
-from django.db.models import QuerySet, Subquery, Count, Q, F
+from django.db.models import Count, Q, F
 from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django_eventstream import send_event
