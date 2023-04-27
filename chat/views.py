@@ -688,8 +688,8 @@ class MessageViewSet(ListModelMixin,
         seen_messages = list()
         for i, msg in enumerate(page):
             if not msg.seen:
-                # msg.seen_message()
-                # seen_messages.append(i)
+                msg.seen_message()
+                seen_messages.append(i)
                 pass
 
         if page is not None:
