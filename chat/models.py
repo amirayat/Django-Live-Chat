@@ -646,31 +646,14 @@ class Message(RootModel):
     seen = models.BooleanField(default=False)
     file = models.OneToOneField(FileUpload, related_name=_(
         'message_file'), on_delete=models.SET_NULL, null=True)
-    member = models.ForeignKey(ChatMember, related_name=_(
-        'memeber_message'), on_delete=models.CASCADE)
+    sender = models.ForeignKey(ChatMember, related_name=_(
+        'sender_message'), on_delete=models.CASCADE)
     reply_to = models.ForeignKey('self', related_name=_(
         'reply_to_message'), on_delete=models.SET_NULL, null=True)
     mentions = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through='Mention', related_name=_('user_mentions'))
     unseen_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through='UnSeen', related_name=_('user_unseen'))
-
-    def mark_as_seen(self) -> None:
-        """
-        turn message seen field to true
-        """
-        self.seen = True
-        self.save()
-
-    def seen_message(self, user: UserModel) -> None:
-        """
-        user: request.user
-        """
-        if self.unseen_users.filter(user=user).exists():
-            self.unseen_users.remove(user)
-            if not self.unseen_users.exists():
-                self.mark_as_seen()
-                return True
 
     def save(self, *args, **kwargs) -> None:
         if self.type not in ["TEXT", "FILE"]:
