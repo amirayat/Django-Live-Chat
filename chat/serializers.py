@@ -18,7 +18,26 @@ from .models import (ChatRoom,
 UserModel = get_user_model()
 
 
-class UserMemberSerializer(serializers.ModelSerializer):
+class UserSerializer(serializers.ModelSerializer):
+    """
+    serializer for chat user
+    """
+    id = HashidSerializerCharField(
+        source_field='users.ChatUser.id', read_only=True)
+    username = serializers.CharField(required=True)
+
+    class Meta:
+        model = UserModel
+        read_only_fields = [
+            "id",
+            "username",
+            "photo",
+            "last_login",
+        ]
+        fields = read_only_fields
+
+
+class MemberSerializer(serializers.ModelSerializer):
     """
     serializer to show chat room members
     """
@@ -45,7 +64,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     """
     id = HashidSerializerCharField(
         source_field='users.ChatUser.id', read_only=True)
-    members = UserMemberSerializer(
+    members = MemberSerializer(
         many=True, read_only=True, source='some_members')
 
     class Meta:
@@ -61,7 +80,7 @@ class ChatRoomSingleMemberSerializer(serializers.ModelSerializer):
     """
     id = HashidSerializerCharField(
         source_field='users.ChatUser.id', read_only=True)
-    member = UserMemberSerializer(source='some_members')
+    member = MemberSerializer(source='some_members')
 
     class Meta:
         model = ChatRoom
@@ -94,7 +113,7 @@ class ChatRoomMultiMemberSerializer(serializers.ModelSerializer):
     """
     id = HashidSerializerCharField(
         source_field='users.ChatUser.id', read_only=True)
-    members = UserMemberSerializer(many=True, source='some_members')
+    members = MemberSerializer(many=True, source='some_members')
 
     def validate_members(self, value):
         if len(self.initial_data['members']) == 0:
@@ -420,20 +439,6 @@ class MemberPermissionSerializer(serializers.ModelSerializer):
         ]
 
 
-class MemberUserSerializer(serializers.ModelSerializer):
-    """
-    serializer for chat member with all action permissions
-    """
-    user = UserMemberSerializer()
-
-    class Meta:
-        model = ChatMember
-        fields = [
-            "user",
-            "role"
-        ]
-
-
 class UploadSerializer(serializers.ModelSerializer):
     """
     serializer class to upload a file
@@ -528,6 +533,20 @@ class ReportSerializer(serializers.ModelSerializer):
 # •••••••••••
 # Message
 # •••••••••••
+class SenderSerializer(serializers.ModelSerializer):
+    """
+    serializer for message sender
+    """
+    user = UserSerializer()
+
+    class Meta:
+        model = ChatMember
+        fields = [
+            "user",
+            "role"
+        ]
+
+
 class ReplyToMessageSerializer(serializers.ModelSerializer):
     """
     serializer for reply to message 
@@ -562,8 +581,8 @@ class MessageSerializer(serializers.ModelSerializer):
         source_field='users.ChatUser.id', read_only=True)
     reply_to = ReplyToMessageSerializer(read_only=True)
     file = UploadSerializer(read_only=True, allow_null=True)
-    member = MemberUserSerializer(read_only=True)
-    mentions = UserMemberSerializer(many=True, read_only=True)
+    sender = SenderSerializer(read_only=True)
+    mentions = MemberSerializer(many=True, read_only=True)
 
     def validate(self, attrs):
         type = attrs.get("type")
@@ -583,7 +602,7 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "seen",
-            "member",
+            "sender",
             "created_at",
         ]
         fields = read_only_fields + [
