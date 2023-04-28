@@ -13,7 +13,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.permissions import IsAdminUser as IsStaff
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin, ListModelMixin
-from .models import ChatRoom, ChatMember, FileUpload, PredefinedMessage, Report, Message
+from .models import ChatRoom, ChatMember, FileUpload, PredefinedMessage, Report, Message, UnSeen
 from .serializers import (ChatRoomSerializer,
                           ListGroupSerializer,
                           ListPrivateChatSerializer,
@@ -641,9 +641,9 @@ class LastSeenOffsetAPIView(RetrieveAPIView):
         limit = int(request.GET.get(
             'limit', settings.REST_FRAMEWORK.get('PAGE_SIZE', '5')))
         chat_room = self.get_object()
-        chat_messages = Message.objects.filter(member__chat_room=chat_room)
+        chat_messages = Message.objects.filter(sender__chat_room=chat_room)
         first_not_seen = chat_messages.filter(
-            Q(seen=False) & ~Q(member__user=request.user))[:1]
+            Q(seen=False) & ~Q(sender__user=request.user))[:1]
         count = chat_messages.filter(created_at__lt=Subquery(
             first_not_seen.values('created_at'))).count()
         if count == 0:
@@ -678,26 +678,24 @@ class MessageViewSet(ListModelMixin,
         except ChatRoom.DoesNotExist:
             raise Http404
         self.check_object_permissions(self.request, chat_room)
-        queryset = Message.objects.filter(member__chat_room=chat_room)\
-            .prefetch_related('member__user', 'file', 'mentions', 'reply_to').order_by('created_at')
+        queryset = Message.objects.filter(sender__chat_room=chat_room)\
+            .prefetch_related('sender__user', 'file', 'mentions', 'reply_to').order_by('created_at')
         if _id_gte:
             queryset = queryset.filter(id__gte=_id_gte)
         page = self.paginate_queryset(queryset)
 
-        # seen messages in the page by request user if there is not seen message
-        seen_messages = list()
-        for i, msg in enumerate(page):
-            if not msg.seen:
-                msg.seen_message()
-                seen_messages.append(i)
-                pass
+        # if there is a seen=False message in page,
+        # remove unseen records for request user and messages in the page
+        # for each message in the page if there is no related unseen record, 
+        # update seen field to True 
+        if not all([msg.seen for msg in page]):
+            UnSeen.objects.filter(user=request.user, message__in=page).delete()
+            Message.objects.filter(
+                id__in=[msg.id for msg in page], unseen_users__isnull=True).update(seen=True)
 
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             response_data = serializer.data
-            for i, obj in enumerate(response_data):
-                if i in seen_messages:
-                    obj['seen'] = True
             return self.get_paginated_response(response_data)
 
         serializer = self.get_serializer(queryset, many=True)
