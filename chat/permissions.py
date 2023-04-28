@@ -155,5 +155,5 @@ class IsMessageSender(IsAuthenticated):
     """
 
     def has_object_permission(self, request, view, obj):
-        if request.user == obj.member.user:
+        if request.user == obj.sender.user:
             return True
